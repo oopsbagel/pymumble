@@ -21,6 +21,7 @@ passwd = args.passwd
 port = args.port
 
 mumble = pymumble.Mumble(server, nick, password=passwd, port=port)
+mumble.receive_sound = True
 mumble.start()
 mumble.is_ready()  # wait for Mumble to get ready to avoid errors after startup
 
