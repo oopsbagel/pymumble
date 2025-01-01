@@ -18,7 +18,6 @@ def sound_received_handler(user, soundchunk):
 
 mumble = pymumble.Mumble(server, nick, password=pwd)
 mumble.callbacks.set_callback(PCS, sound_received_handler)
-mumble.set_receive_sound(1)  # we want to receive sound
 mumble.start()
 
 while 1:

@@ -69,6 +69,9 @@ class Mumble(threading.Thread):
         stereo=False,
         debug=False,
         client_type=0,
+        receive_sound=True,
+        loop_rate=PYMUMBLE_LOOP_RATE,
+        application=PYMUMBLE_VERSION_STRING,
     ):
         """
         host=mumble server hostname or address
@@ -82,6 +85,9 @@ class Mumble(threading.Thread):
         stereo=enable stereo transmission
         debug=if True, send debugging messages (lot of...) to the stdout
         client_type=if 1, flag connection as bot
+        receive_sound=if True, handle incoming audio
+        loop_rate=main loop rate (pause per iteration) in seconds
+        application=application name viewable by other clients on the server
         """
         # TODO: use UDP audio
         threading.Thread.__init__(self)
@@ -118,19 +124,14 @@ class Mumble(threading.Thread):
         self.__opus_profile = PYMUMBLE_AUDIO_TYPE_OPUS_PROFILE
         self.stereo = stereo
         self.client_type = client_type
+        self.receive_sound = receive_sound
+        self.loop_rate = loop_rate
+        self.application = application
 
         if stereo:
             self.Log.debug("Working in STEREO mode.")
         else:
             self.Log.debug("Working in MONO mode.")
-
-        self.receive_sound = (
-            False  # set to True to treat incoming audio, otherwise it is simply ignored
-        )
-
-        self.loop_rate = PYMUMBLE_LOOP_RATE
-
-        self.application = PYMUMBLE_VERSION_STRING
 
         self.callbacks = callbacks.CallBacks()  # callbacks management
 
@@ -710,18 +711,6 @@ class Mumble(threading.Thread):
             pos += size  # go further in the packet, after the audio frame
         # TODO: get position info
 
-    def set_application_string(self, string):
-        """Set the application name, that can be viewed by other clients on the server"""
-        self.application = string
-
-    def set_loop_rate(self, rate):
-        """Set the current main loop rate (pause per iteration)"""
-        self.loop_rate = rate
-
-    def get_loop_rate(self):
-        """Get the current main loop rate (pause per iteration)"""
-        return self.loop_rate
-
     def set_codec_profile(self, profile):
         """set the audio profile"""
         if profile in ["audio", "voip", "restricted_lowdelay"]:
@@ -732,13 +721,6 @@ class Mumble(threading.Thread):
     def get_codec_profile(self):
         """return the audio profile string"""
         return self.__opus_profile
-
-    def set_receive_sound(self, value):
-        """Enable or disable the management of incoming sounds"""
-        if value:
-            self.receive_sound = True
-        else:
-            self.receive_sound = False
 
     def is_ready(self):
         """Wait for the connection to be fully completed.  To be used in the main thread"""
