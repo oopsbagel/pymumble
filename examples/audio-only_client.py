@@ -23,8 +23,8 @@
 # Works on MacOS. Does NOT work on RPi 3B+ (I cannot figure out why. Help will
 # be much appreciated)
 
-import pymumble.pymumble_py3 as pymumble_py3
-from pymumble.pymumble_py3.callbacks import PYMUMBLE_CLBK_SOUNDRECEIVED as PCS
+import pymumble.pymumble as pymumble
+from pymumble.pymumble.callbacks import PYMUMBLE_CLBK_SOUNDRECEIVED as PCS
 import pyaudio
 
 # Connection details for mumble server. Hardcoded for now, will have to be
@@ -59,7 +59,7 @@ def sound_received_handler(user, soundchunk):
 
 
 # Spin up a client and connect to mumble server
-mumble = pymumble_py3.Mumble(server, nick, password=pwd, port=port)
+mumble = pymumble.Mumble(server, nick, password=pwd, port=port)
 # set up callback called when PCS event occurs
 mumble.callbacks.set_callback(PCS, sound_received_handler)
 mumble.set_receive_sound(1)  # Enable receiving sound from mumble server
