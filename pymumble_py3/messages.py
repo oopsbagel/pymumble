@@ -25,8 +25,7 @@ class MoveCmd(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_CMD_MOVE
-        self.parameters = {"session": session,
-                           "channel_id": channel_id}
+        self.parameters = {"session": session, "channel_id": channel_id}
 
 
 class TextMessage(Cmd):
@@ -36,9 +35,11 @@ class TextMessage(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_CMD_TEXTMESSAGE
-        self.parameters = {"session": session,
-                           "channel_id": channel_id,
-                           "message": message}
+        self.parameters = {
+            "session": session,
+            "channel_id": channel_id,
+            "message": message,
+        }
 
 
 class TextPrivateMessage(Cmd):
@@ -48,8 +49,7 @@ class TextPrivateMessage(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_CMD_TEXTPRIVATEMESSAGE
-        self.parameters = {"session": session,
-                           "message": message}
+        self.parameters = {"session": session, "message": message}
 
 
 class ModUserState(Cmd):
@@ -79,9 +79,7 @@ class CreateChannel(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_MSG_TYPES_CHANNELSTATE
-        self.parameters = {"parent": parent,
-                           "name": name,
-                           "temporary": temporary}
+        self.parameters = {"parent": parent, "name": name, "temporary": temporary}
 
 
 class RemoveChannel(Cmd):
@@ -111,8 +109,7 @@ class VoiceTarget(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_MSG_TYPES_VOICETARGET
-        self.parameters = {"id": voice_id,
-                           "targets": targets}
+        self.parameters = {"id": voice_id, "targets": targets}
 
 
 class LinkChannel(Cmd):
@@ -152,7 +149,9 @@ class UpdateACL(Cmd):
         Cmd.__init__(self)
 
         self.cmd = PYMUMBLE_CMD_UPDATEACL
-        self.parameters = {"channel_id": channel_id,
-                           "inherit_acls": inherit_acls,
-                           "chan_group": chan_group,
-                           "chan_acl": chan_acl}
+        self.parameters = {
+            "channel_id": channel_id,
+            "inherit_acls": inherit_acls,
+            "chan_group": chan_group,
+            "chan_acl": chan_acl,
+        }

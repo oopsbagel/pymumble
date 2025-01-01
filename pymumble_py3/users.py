@@ -65,7 +65,10 @@ class User(dict):
 
         if mumble_object.receive_sound:
             from . import soundqueue
-            self.sound = soundqueue.SoundQueue(self.mumble_object)  # will hold this user incoming audio
+
+            self.sound = soundqueue.SoundQueue(
+                self.mumble_object
+            )  # will hold this user incoming audio
         else:
             self.sound = None
 
@@ -76,8 +79,15 @@ class User(dict):
         if message.HasField("actor"):
             actions["actor"] = message.actor
 
-        for (field, value) in message.ListFields():
-            if field.name in ("session", "actor", "comment", "texture", "plugin_context", "plugin_identity"):
+        for field, value in message.ListFields():
+            if field.name in (
+                "session",
+                "actor",
+                "comment",
+                "texture",
+                "plugin_context",
+                "plugin_identity",
+            ):
                 continue
             actions.update(self.update_field(field.name, value))
 
@@ -159,63 +169,55 @@ class User(dict):
 
     def suppress(self):
         """Disable a user"""
-        params = {"session": self["session"],
-                  "suppress": True}
+        params = {"session": self["session"], "suppress": True}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def unsuppress(self):
         """Enable a user"""
-        params = {"session": self["session"],
-                  "suppress": False}
+        params = {"session": self["session"], "suppress": False}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def recording(self):
         """Set the user as recording"""
-        params = {"session": self["session"],
-                  "recording": True}
+        params = {"session": self["session"], "recording": True}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def unrecording(self):
         """Set the user as not recording"""
-        params = {"session": self["session"],
-                  "recording": False}
+        params = {"session": self["session"], "recording": False}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def comment(self, comment):
         """Set the user comment"""
-        params = {"session": self["session"],
-                  "comment": comment}
+        params = {"session": self["session"], "comment": comment}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def texture(self, texture):
         """Set the user texture"""
-        params = {"session": self["session"],
-                  "texture": texture}
+        params = {"session": self["session"], "texture": texture}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
-    
+
     def register(self):
         """Register the user (mostly for myself)"""
-        params = {"session": self["session"],
-                  "user_id": 0}
- 
+        params = {"session": self["session"], "user_id": 0}
+
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def update_context(self, context_name):
-        params = {"session": self["session"],
-                  "plugin_context": context_name}
+        params = {"session": self["session"], "plugin_context": context_name}
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
@@ -228,7 +230,9 @@ class User(dict):
             authenticate.tokens.extend([token])
             authenticate.opus = True
             self.mumble_object.Log.debug("sending: authenticate: %s", authenticate)
-            self.mumble_object.send_message(PYMUMBLE_MSG_TYPES_AUTHENTICATE, authenticate)
+            self.mumble_object.send_message(
+                PYMUMBLE_MSG_TYPES_AUTHENTICATE, authenticate
+            )
 
         session = self.mumble_object.users.myself_session
         cmd = messages.MoveCmd(session, channel_id)
@@ -251,33 +255,27 @@ class User(dict):
         self.mumble_object.execute_command(cmd)
 
     def kick(self, reason=""):
-        params = {"session": self["session"],
-                  "reason": reason,
-                  "ban": False}
+        params = {"session": self["session"], "reason": reason, "ban": False}
 
         cmd = messages.RemoveUser(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def ban(self, reason=""):
-        params = {"session": self["session"],
-                  "reason": reason,
-                  "ban": True}
+        params = {"session": self["session"], "reason": reason, "ban": True}
 
         cmd = messages.RemoveUser(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def add_listening_channels(self, channel):
         """Add user to listening channel"""
-        params = {"session": self["session"],
-                  "listening_channel_add": channel}
+        params = {"session": self["session"], "listening_channel_add": channel}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)
 
     def remove_listening_channels(self, channel):
         """Remove user from listening channel"""
-        params = {"session": self["session"],
-                  "listening_channel_remove": channel}
+        params = {"session": self["session"], "listening_channel_remove": channel}
 
         cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
         self.mumble_object.execute_command(cmd)

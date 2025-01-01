@@ -42,17 +42,19 @@ CHANNELS = 1
 RATE = 48000  # pymumble soundchunk.pcm is 48000Hz
 
 p = pyaudio.PyAudio()
-stream = p.open(format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
-                input=True,  # enable both talk
-                output=True,  # and listen
-                frames_per_buffer=CHUNK)
+stream = p.open(
+    format=FORMAT,
+    channels=CHANNELS,
+    rate=RATE,
+    input=True,  # enable both talk
+    output=True,  # and listen
+    frames_per_buffer=CHUNK,
+)
 
 
 # mumble client set up
 def sound_received_handler(user, soundchunk):
-    """ play sound received from mumble server upon its arrival """
+    """play sound received from mumble server upon its arrival"""
     stream.write(soundchunk.pcm)
 
 

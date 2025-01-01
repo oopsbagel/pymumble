@@ -66,12 +66,21 @@ class ACL(dict):
 
     def send_update(self):
         all_groups = self.groups.items()
-        res_group = [vars(i[1]) for i in all_groups]  # Transform the Class into a dictionary
+        res_group = [
+            vars(i[1]) for i in all_groups
+        ]  # Transform the Class into a dictionary
 
         all_acls = self.acls.items()
-        res_acl = [vars(i[1]) for i in all_acls]  # Transform the Class into a dictionary
+        res_acl = [
+            vars(i[1]) for i in all_acls
+        ]  # Transform the Class into a dictionary
 
-        cmd = messages.UpdateACL(channel_id=self.channel_id, inherit_acls=self.inherit_acls, chan_group=res_group, chan_acl=res_acl)
+        cmd = messages.UpdateACL(
+            channel_id=self.channel_id,
+            inherit_acls=self.inherit_acls,
+            chan_group=res_group,
+            chan_acl=res_acl,
+        )
         self.mumble_object.execute_command(cmd)
 
 
@@ -92,11 +101,11 @@ class ChanGroup(dict):
         """Update a ACL information, based on the incoming message"""
         self.name = str(message.name)
 
-        if message.HasField('inherit'):
+        if message.HasField("inherit"):
             self.inherit = bool(message.inherit)
-        if message.HasField('inherited'):
+        if message.HasField("inherited"):
             self.inherited = bool(message.inherited)
-        if message.HasField('inheritable'):
+        if message.HasField("inheritable"):
             self.inheritable = bool(message.inheritable)
 
         if message.add:
@@ -124,17 +133,17 @@ class ChanACL(dict):
 
     def update(self, message):
         """Update a ACL information, based on the incoming message"""
-        if message.HasField('apply_here'):
+        if message.HasField("apply_here"):
             self.apply_here = bool(message.apply_here)
-        if message.HasField('apply_subs'):
+        if message.HasField("apply_subs"):
             self.apply_subs = bool(message.apply_subs)
-        if message.HasField('inherited'):
+        if message.HasField("inherited"):
             self.inherited = bool(message.inherited)
-        if message.HasField('user_id'):
+        if message.HasField("user_id"):
             self.user_id = int(message.user_id)
-        if message.HasField('group'):
+        if message.HasField("group"):
             self.group = str(message.group)
-        if message.HasField('grant'):
+        if message.HasField("grant"):
             self.grant = int(message.grant)
-        if message.HasField('deny'):
+        if message.HasField("deny"):
             self.deny = int(message.deny)

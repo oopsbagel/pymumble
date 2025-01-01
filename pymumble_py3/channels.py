@@ -26,7 +26,9 @@ class Channels(dict):
             self.callbacks(PYMUMBLE_CLBK_CHANNELCREATED, self[message.channel_id])
         else:  # update the channel
             actions = self[message.channel_id].update(message)
-            self.callbacks(PYMUMBLE_CLBK_CHANNELUPDATED, self[message.channel_id], actions)
+            self.callbacks(
+                PYMUMBLE_CLBK_CHANNELUPDATED, self[message.channel_id], actions
+            )
 
         self.lock.release()
 
@@ -43,7 +45,7 @@ class Channels(dict):
 
     def find_by_tree(self, tree):
         """Find a channel by its full path (a list with an element for each leaf)"""
-        if not getattr(tree, '__iter__', False):
+        if not getattr(tree, "__iter__", False):
             tree = tree  # function use argument as a list
 
         current = self[0]
@@ -67,7 +69,10 @@ class Channels(dict):
         childs = list()
 
         for item in self.values():
-            if item.get('parent') is not None and item["parent"] == channel["channel_id"]:
+            if (
+                item.get("parent") is not None
+                and item["parent"] == channel["channel_id"]
+            ):
                 childs.append(item)
 
         return childs
@@ -122,7 +127,12 @@ class Channels(dict):
         """
         for channel in list(self.values()):
             if "links" in channel:
-                cmd = messages.UnlinkChannel({"channel_id": channel['channel_id'], "remove_ids": channel["links"]})
+                cmd = messages.UnlinkChannel(
+                    {
+                        "channel_id": channel["channel_id"],
+                        "remove_ids": channel["links"],
+                    }
+                )
                 self.mumble_object.execute_command(cmd)
 
 
@@ -148,17 +158,21 @@ class Channel(dict):
         """Update a channel based on an incoming message"""
         actions = dict()
 
-        for (field, value) in message.ListFields():
+        for field, value in message.ListFields():
             if field.name in ("session", "actor", "description_hash"):
                 continue
             actions.update(self.update_field(field.name, value))
 
         if message.HasField("description_hash"):
-            actions.update(self.update_field("description_hash", message.description_hash))
+            actions.update(
+                self.update_field("description_hash", message.description_hash)
+            )
             if message.HasField("description"):
                 self.mumble_object.blobs[message.description_hash] = message.description
             else:
-                self.mumble_object.blobs.get_channel_description(message.description_hash)
+                self.mumble_object.blobs.get_channel_description(
+                    message.description_hash
+                )
 
         return actions  # return a dict with updates performed, useful for the callback functions
 
@@ -215,57 +229,48 @@ class Channel(dict):
 
     def link(self, channel_id):
         """Link selected channel with other channel"""
-        cmd = messages.LinkChannel({"channel_id": self["channel_id"], "add_id": channel_id})
+        cmd = messages.LinkChannel(
+            {"channel_id": self["channel_id"], "add_id": channel_id}
+        )
         self.mumble_object.execute_command(cmd)
 
     def unlink(self, channel_id):
         """Unlink one channel which is linked to a specific channel."""
-        cmd = messages.UnlinkChannel({"channel_id": self["channel_id"], "remove_ids": [channel_id]})
+        cmd = messages.UnlinkChannel(
+            {"channel_id": self["channel_id"], "remove_ids": [channel_id]}
+        )
         self.mumble_object.execute_command(cmd)
 
     def unlink_all(self):
         """Unlink all channels which is linked to a specific channel."""
         if "links" in self:
-            cmd = messages.UnlinkChannel({"channel_id": self["channel_id"], "remove_ids": self["links"]})
+            cmd = messages.UnlinkChannel(
+                {"channel_id": self["channel_id"], "remove_ids": self["links"]}
+            )
             self.mumble_object.execute_command(cmd)
 
     def rename_channel(self, name):
-        params = {
-            'channel_id': self['channel_id'],
-            'name': name
-        }
+        params = {"channel_id": self["channel_id"], "name": name}
         cmd = messages.UpdateChannel(params)
         self.mumble_object.execute_command(cmd)
 
     def move_channel(self, new_parent_id):
-        params = {
-            'channel_id': self['channel_id'],
-            'parent': new_parent_id
-        }
+        params = {"channel_id": self["channel_id"], "parent": new_parent_id}
         cmd = messages.UpdateChannel(params)
         self.mumble_object.execute_command(cmd)
 
     def set_channel_position(self, position):
-        params = {
-            'channel_id': self['channel_id'],
-            'position': position
-        }
+        params = {"channel_id": self["channel_id"], "position": position}
         cmd = messages.UpdateChannel(params)
         self.mumble_object.execute_command(cmd)
 
     def set_channel_max_users(self, max_users):
-        params = {
-            'channel_id': self['channel_id'],
-            'max_users': max_users
-        }
+        params = {"channel_id": self["channel_id"], "max_users": max_users}
         cmd = messages.UpdateChannel(params)
         self.mumble_object.execute_command(cmd)
 
     def set_channel_description(self, description):
-        params = {
-            'channel_id': self['channel_id'],
-            'description': description
-        }
+        params = {"channel_id": self["channel_id"], "description": description}
         cmd = messages.UpdateChannel(params)
         self.mumble_object.execute_command(cmd)
 

@@ -78,7 +78,7 @@ class TextTooLongError(Exception):
         self.value = value
 
     def __str__(self):
-        return 'Maximum Text allowed length: {}'.format(self.value)
+        return "Maximum Text allowed length: {}".format(self.value)
 
 
 class ImageTooBigError(Exception):
@@ -88,7 +88,7 @@ class ImageTooBigError(Exception):
         self.value = value
 
     def __str__(self):
-        return 'Maximum Text/Image allowed length: {}'.format(self.value)
+        return "Maximum Text/Image allowed length: {}".format(self.value)
 
 
 class ACLChanGroupNotExist(Exception):
@@ -98,4 +98,4 @@ class ACLChanGroupNotExist(Exception):
         self.value = value
 
     def __str__(self):
-        return 'ACL ChanGroup does not exist: {}'.format(self.value)
+        return "ACL ChanGroup does not exist: {}".format(self.value)

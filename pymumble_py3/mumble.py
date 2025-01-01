@@ -19,19 +19,35 @@ from . import tools
 from . import mumble_pb2
 
 
-def _wrap_socket(sock, keyfile=None, certfile=None, verify_mode=ssl.CERT_NONE, server_hostname=None):
+def _wrap_socket(
+    sock, keyfile=None, certfile=None, verify_mode=ssl.CERT_NONE, server_hostname=None
+):
     try:
         ssl_context = ssl.create_default_context()
         if certfile:
             ssl_context.load_cert_chain(certfile, keyfile)
-        ssl_context.check_hostname = (verify_mode != ssl.CERT_NONE) and (server_hostname is not None)
+        ssl_context.check_hostname = (verify_mode != ssl.CERT_NONE) and (
+            server_hostname is not None
+        )
         ssl_context.verify_mode = verify_mode
         return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
     except AttributeError:
         try:
-            return ssl.wrap_socket(sock, keyfile, certfile, cert_reqs=verify_mode, ssl_version=ssl.PROTOCOL_TLS)
+            return ssl.wrap_socket(
+                sock,
+                keyfile,
+                certfile,
+                cert_reqs=verify_mode,
+                ssl_version=ssl.PROTOCOL_TLS,
+            )
         except AttributeError:
-            return ssl.wrap_socket(sock, keyfile, certfile, cert_reqs=verify_mode, ssl_version=ssl.PROTOCOL_TLSv1)
+            return ssl.wrap_socket(
+                sock,
+                keyfile,
+                certfile,
+                cert_reqs=verify_mode,
+                ssl_version=ssl.PROTOCOL_TLSv1,
+            )
 
 
 class Mumble(threading.Thread):
@@ -40,7 +56,20 @@ class Mumble(threading.Thread):
     basically a thread
     """
 
-    def __init__(self, host, user, port=64738, password='', certfile=None, keyfile=None, reconnect=False, tokens=None, stereo=False, debug=False, client_type=0):
+    def __init__(
+        self,
+        host,
+        user,
+        port=64738,
+        password="",
+        certfile=None,
+        keyfile=None,
+        reconnect=False,
+        tokens=None,
+        stereo=False,
+        debug=False,
+        client_type=0,
+    ):
         """
         host=mumble server hostname or address
         port=mumble server port
@@ -59,7 +88,9 @@ class Mumble(threading.Thread):
 
         if tokens is None:
             tokens = []
-        self.Log = logging.getLogger("PyMumble")  # logging object for errors and debugging
+        self.Log = logging.getLogger(
+            "PyMumble"
+        )  # logging object for errors and debugging
         if debug:
             self.Log.setLevel(logging.DEBUG)
         else:
@@ -67,11 +98,13 @@ class Mumble(threading.Thread):
 
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s-%(name)s-%(levelname)s-%(message)s')
+        formatter = logging.Formatter("%(asctime)s-%(name)s-%(levelname)s-%(message)s")
         ch.setFormatter(formatter)
         self.Log.addHandler(ch)
 
-        self.parent_thread = threading.current_thread()  # main thread of the calling application
+        self.parent_thread = (
+            threading.current_thread()
+        )  # main thread of the calling application
         self.mumble_thread = None  # thread of the mumble client library
 
         self.host = host
@@ -91,7 +124,9 @@ class Mumble(threading.Thread):
         else:
             self.Log.debug("Working in MONO mode.")
 
-        self.receive_sound = False  # set to True to treat incoming audio, otherwise it is simply ignored
+        self.receive_sound = (
+            False  # set to True to treat incoming audio, otherwise it is simply ignored
+        )
 
         self.loop_rate = PYMUMBLE_LOOP_RATE
 
@@ -99,14 +134,18 @@ class Mumble(threading.Thread):
 
         self.callbacks = callbacks.CallBacks()  # callbacks management
 
-        self.ready_lock = threading.Lock()  # released when the connection is fully established with the server
+        self.ready_lock = (
+            threading.Lock()
+        )  # released when the connection is fully established with the server
         self.ready_lock.acquire()
 
         self.positional = None
 
     def init_connection(self):
         """Initialize variables that are local to a connection, (needed if the client automatically reconnect)"""
-        self.ready_lock.acquire(False)  # reacquire the ready-lock in case of reconnection
+        self.ready_lock.acquire(
+            False
+        )  # reacquire the ready-lock in case of reconnection
 
         self.connected = PYMUMBLE_CONN_STATE_NOT_CONNECTED
         self.control_socket = None
@@ -121,18 +160,37 @@ class Mumble(threading.Thread):
         self.server_max_message_length = 5000
         self.server_max_image_message_length = 131072
 
-        self.users = users.Users(self, self.callbacks)  # contains the server's connected users information
-        self.channels = channels.Channels(self, self.callbacks)  # contains the server's channels information
+        self.users = users.Users(
+            self, self.callbacks
+        )  # contains the server's connected users information
+        self.channels = channels.Channels(
+            self, self.callbacks
+        )  # contains the server's channels information
         self.blobs = blobs.Blobs(self)  # manage the blob objects
         if self.receive_sound:
             from . import soundoutput
-            self.sound_output = soundoutput.SoundOutput(self, PYMUMBLE_AUDIO_PER_PACKET, self.bandwidth, stereo=self.stereo, opus_profile=self.__opus_profile)  # manage the outgoing sounds
+
+            self.sound_output = soundoutput.SoundOutput(
+                self,
+                PYMUMBLE_AUDIO_PER_PACKET,
+                self.bandwidth,
+                stereo=self.stereo,
+                opus_profile=self.__opus_profile,
+            )  # manage the outgoing sounds
         else:
             self.sound_output = None
-        self.commands = commands.Commands()  # manage commands sent between the main and the mumble threads
+        self.commands = (
+            commands.Commands()
+        )  # manage commands sent between the main and the mumble threads
 
         self.receive_buffer = bytes()  # initialize the control connection input buffer
-        self.ping_stats = {"last_rcv": 0, "time_send": 0, "nb": 0, "avg": 40.0, "var": 0.0}  # Set / reset ping stats
+        self.ping_stats = {
+            "last_rcv": 0,
+            "time_send": 0,
+            "nb": 0,
+            "avg": 40.0,
+            "var": 0.0,
+        }  # Set / reset ping stats
 
     def run(self):
         """Connect to the server and start the loop in its thread.  Retry if requested"""
@@ -142,10 +200,14 @@ class Mumble(threading.Thread):
         while True:
             self.init_connection()  # reset the connection-specific object members
 
-            if self.connect() >= PYMUMBLE_CONN_STATE_FAILED:  # some error occurred, exit here
+            if (
+                self.connect() >= PYMUMBLE_CONN_STATE_FAILED
+            ):  # some error occurred, exit here
                 self.ready_lock.release()
                 if not self.reconnect or not self.parent_thread.is_alive():
-                    raise ConnectionRejectedError("Connection error with the Mumble (murmur) Server")
+                    raise ConnectionRejectedError(
+                        "Connection error with the Mumble (murmur) Server"
+                    )
                 else:
                     time.sleep(PYMUMBLE_CONNECTION_RETRY_INTERVAL)
                     continue
@@ -166,10 +228,17 @@ class Mumble(threading.Thread):
         """Connect to the server"""
         try:
             # Get IPv4/IPv6 server address
-            server_info = socket.getaddrinfo(self.host, self.port, type=socket.SOCK_STREAM)
+            server_info = socket.getaddrinfo(
+                self.host, self.port, type=socket.SOCK_STREAM
+            )
 
             # Connect the SSL tunnel
-            self.Log.debug("connecting to %s (%s) on port %i.", self.host, server_info[0][1], self.port)
+            self.Log.debug(
+                "connecting to %s (%s) on port %i.",
+                self.host,
+                server_info[0][1],
+                self.port,
+            )
             std_sock = socket.socket(server_info[0][0], socket.SOCK_STREAM)
             std_sock.settimeout(10)
         except socket.error:
@@ -186,10 +255,22 @@ class Mumble(threading.Thread):
             # Perform the Mumble authentication
             version = mumble_pb2.Version()
             if PYMUMBLE_PROTOCOL_VERSION[2] > 255:
-                version.version_v1 = (PYMUMBLE_PROTOCOL_VERSION[0] << 16) + (PYMUMBLE_PROTOCOL_VERSION[1] << 8) + 255
+                version.version_v1 = (
+                    (PYMUMBLE_PROTOCOL_VERSION[0] << 16)
+                    + (PYMUMBLE_PROTOCOL_VERSION[1] << 8)
+                    + 255
+                )
             else:
-                version.version_v1 = (PYMUMBLE_PROTOCOL_VERSION[0] << 16) + (PYMUMBLE_PROTOCOL_VERSION[1] << 8) + (PYMUMBLE_PROTOCOL_VERSION[2])
-            version.version_v2 = (PYMUMBLE_PROTOCOL_VERSION[0] << 48) + (PYMUMBLE_PROTOCOL_VERSION[1] << 32) + (PYMUMBLE_PROTOCOL_VERSION[2] << 16)
+                version.version_v1 = (
+                    (PYMUMBLE_PROTOCOL_VERSION[0] << 16)
+                    + (PYMUMBLE_PROTOCOL_VERSION[1] << 8)
+                    + (PYMUMBLE_PROTOCOL_VERSION[2])
+                )
+            version.version_v2 = (
+                (PYMUMBLE_PROTOCOL_VERSION[0] << 48)
+                + (PYMUMBLE_PROTOCOL_VERSION[1] << 32)
+                + (PYMUMBLE_PROTOCOL_VERSION[2] << 16)
+            )
             version.release = self.application
             version.os = PYMUMBLE_OS_STRING
             version.os_version = PYMUMBLE_OS_VERSION_STRING
@@ -226,21 +307,34 @@ class Mumble(threading.Thread):
         last_ping = time.time()  # keep track of the last ping time
 
         # loop as long as the connection and the parent thread are alive
-        while self.connected not in (PYMUMBLE_CONN_STATE_NOT_CONNECTED, PYMUMBLE_CONN_STATE_FAILED) and self.parent_thread.is_alive() and not self.exit:
-            if last_ping + PYMUMBLE_PING_DELAY <= time.time():  # when it is time, send the ping
+        while (
+            self.connected
+            not in (PYMUMBLE_CONN_STATE_NOT_CONNECTED, PYMUMBLE_CONN_STATE_FAILED)
+            and self.parent_thread.is_alive()
+            and not self.exit
+        ):
+            if (
+                last_ping + PYMUMBLE_PING_DELAY <= time.time()
+            ):  # when it is time, send the ping
                 self.ping()
                 last_ping = time.time()
 
             if self.connected == PYMUMBLE_CONN_STATE_CONNECTED:
                 while self.commands.is_cmd():
-                    self.treat_command(self.commands.pop_cmd())  # send the commands coming from the application to the server
+                    self.treat_command(
+                        self.commands.pop_cmd()
+                    )  # send the commands coming from the application to the server
 
                 if self.sound_output:
                     self.sound_output.send_audio()  # send outgoing audio if available
 
-            (rlist, wlist, xlist) = select.select([self.control_socket], [], [self.control_socket], self.loop_rate)  # wait for a socket activity
+            (rlist, wlist, xlist) = select.select(
+                [self.control_socket], [], [self.control_socket], self.loop_rate
+            )  # wait for a socket activity
 
-            if self.control_socket in rlist:  # something to be read on the control socket
+            if (
+                self.control_socket in rlist
+            ):  # something to be read on the control socket
                 self.read_control_messages()
             elif self.control_socket in xlist:  # socket was closed
                 self.control_socket.close()
@@ -250,36 +344,44 @@ class Mumble(threading.Thread):
         """Send the keepalive through available channels"""
         ping = mumble_pb2.Ping()
         ping.timestamp = int(time.time())
-        ping.tcp_ping_avg = self.ping_stats['avg']
-        ping.tcp_ping_var = self.ping_stats['var']
-        ping.tcp_packets = self.ping_stats['nb']
+        ping.tcp_ping_avg = self.ping_stats["avg"]
+        ping.tcp_ping_var = self.ping_stats["var"]
+        ping.tcp_packets = self.ping_stats["nb"]
 
         self.Log.debug("sending: ping: %s", ping)
         self.send_message(PYMUMBLE_MSG_TYPES_PING, ping)
-        self.ping_stats['time_send'] = int(time.time() * 1000)
-        self.Log.debug(self.ping_stats['last_rcv'])
-        if self.ping_stats['last_rcv'] != 0 and int(time.time() * 1000) > self.ping_stats['last_rcv'] + (60 * 1000):
+        self.ping_stats["time_send"] = int(time.time() * 1000)
+        self.Log.debug(self.ping_stats["last_rcv"])
+        if self.ping_stats["last_rcv"] != 0 and int(
+            time.time() * 1000
+        ) > self.ping_stats["last_rcv"] + (60 * 1000):
             self.Log.debug("Ping too long ! Disconnected ?")
             self.connected = PYMUMBLE_CONN_STATE_NOT_CONNECTED
 
     def ping_response(self, mess):
-        self.ping_stats['last_rcv'] = int(time.time() * 1000)
-        ping = int(time.time() * 1000) - self.ping_stats['time_send']
-        old_avg = self.ping_stats['avg']
-        nb = self.ping_stats['nb']
-        new_avg = ((self.ping_stats['avg'] * nb) + ping) / (nb + 1)
+        self.ping_stats["last_rcv"] = int(time.time() * 1000)
+        ping = int(time.time() * 1000) - self.ping_stats["time_send"]
+        old_avg = self.ping_stats["avg"]
+        nb = self.ping_stats["nb"]
+        new_avg = ((self.ping_stats["avg"] * nb) + ping) / (nb + 1)
 
         try:
-            self.ping_stats['var'] = self.ping_stats['var'] + pow(old_avg - new_avg, 2) + (1 / nb) * pow(ping - new_avg, 2)
+            self.ping_stats["var"] = (
+                self.ping_stats["var"]
+                + pow(old_avg - new_avg, 2)
+                + (1 / nb) * pow(ping - new_avg, 2)
+            )
         except ZeroDivisionError:
             pass
 
-        self.ping_stats['avg'] = new_avg
-        self.ping_stats['nb'] += 1
+        self.ping_stats["avg"] = new_avg
+        self.ping_stats["nb"] += 1
 
     def send_message(self, type, message):
         """Send a control message to the server"""
-        packet = struct.pack("!HL", type, message.ByteSize()) + message.SerializeToString()
+        packet = (
+            struct.pack("!HL", type, message.ByteSize()) + message.SerializeToString()
+        )
 
         while len(packet) > 0:
             self.Log.debug("sending message")
@@ -312,15 +414,19 @@ class Mumble(threading.Thread):
 
             # self.Log.debug("message received : " + tohex(self.receive_buffer[0:size+6]))  # for debugging
 
-            message = self.receive_buffer[6:size + 6]  # get the control message
-            self.receive_buffer = self.receive_buffer[size + 6:]  # remove from the buffer the read part
+            message = self.receive_buffer[6 : size + 6]  # get the control message
+            self.receive_buffer = self.receive_buffer[
+                size + 6 :
+            ]  # remove from the buffer the read part
 
             self.dispatch_control_message(type, message)
 
     def dispatch_control_message(self, type, message):
         """Dispatch control messages based on their type"""
         self.Log.debug("dispatch control message")
-        if type == PYMUMBLE_MSG_TYPES_UDPTUNNEL:  # audio encapsulated in control message
+        if (
+            type == PYMUMBLE_MSG_TYPES_UDPTUNNEL
+        ):  # audio encapsulated in control message
             if self.sound_output:
                 self.sound_received(message)
 
@@ -348,7 +454,9 @@ class Mumble(threading.Thread):
             self.ready_lock.release()
             raise ConnectionRejectedError(mess.reason)
 
-        elif type == PYMUMBLE_MSG_TYPES_SERVERSYNC:  # this message finish the connection process
+        elif (
+            type == PYMUMBLE_MSG_TYPES_SERVERSYNC
+        ):  # this message finish the connection process
             mess = mumble_pb2.ServerSync()
             mess.ParseFromString(message)
             self.Log.debug("message: serversync : %s", mess)
@@ -474,26 +582,31 @@ class Mumble(threading.Thread):
             mess = mumble_pb2.ServerConfig()
             mess.ParseFromString(message)
             self.Log.debug("message: ServerConfig : %s", mess)
-            for line in str(mess).split('\n'):
-                items = line.split(':')
+            for line in str(mess).split("\n"):
+                items = line.split(":")
                 if len(items) != 2:
                     continue
-                if items[0] == 'allow_html':
-                    self.server_allow_html = items[1].strip() == 'true'
-                elif items[0] == 'message_length':
+                if items[0] == "allow_html":
+                    self.server_allow_html = items[1].strip() == "true"
+                elif items[0] == "message_length":
                     self.server_max_message_length = int(items[1].strip())
-                elif items[0] == 'image_message_length':
+                elif items[0] == "image_message_length":
                     self.server_max_image_message_length = int(items[1].strip())
 
     def set_bandwidth(self, bandwidth):
         """Set the total allowed outgoing bandwidth"""
-        if self.server_max_bandwidth is not None and bandwidth > self.server_max_bandwidth:
+        if (
+            self.server_max_bandwidth is not None
+            and bandwidth > self.server_max_bandwidth
+        ):
             self.bandwidth = self.server_max_bandwidth
         else:
             self.bandwidth = bandwidth
 
         if self.sound_output:
-            self.sound_output.set_bandwidth(self.bandwidth)  # communicate the update to the outgoing audio manager
+            self.sound_output.set_bandwidth(
+                self.bandwidth
+            )  # communicate the update to the outgoing audio manager
 
     def sound_received(self, message):
         """Manage a received sound message"""
@@ -511,49 +624,81 @@ class Mumble(threading.Thread):
             return
 
         session = tools.VarInt()  # decode session id
-        pos += session.decode(message[pos:pos + 10])
+        pos += session.decode(message[pos : pos + 10])
 
         sequence = tools.VarInt()  # decode sequence number
-        pos += sequence.decode(message[pos:pos + 10])
+        pos += sequence.decode(message[pos : pos + 10])
 
-        self.Log.debug("audio packet received from %i, sequence %i, type:%i, target:%i, length:%i", session.value, sequence.value, type, target, len(message))
+        self.Log.debug(
+            "audio packet received from %i, sequence %i, type:%i, target:%i, length:%i",
+            session.value,
+            sequence.value,
+            type,
+            target,
+            len(message),
+        )
 
         terminator = False  # set to true if it's the last 10 ms audio frame for the packet (used with CELT codec)
-        while (pos < len(message)) and not terminator:  # get the audio frames one by one
+        while (
+            pos < len(message)
+        ) and not terminator:  # get the audio frames one by one
             if type == PYMUMBLE_AUDIO_TYPE_OPUS:
                 size = tools.VarInt()  # OPUS use varint for the frame length
 
-                pos += size.decode(message[pos:pos + 10])
+                pos += size.decode(message[pos : pos + 10])
                 size = size.value
 
                 if not (size & 0x2000):  # terminator is 0x2000 in the resulting int.
                     terminator = True  # should actually always be 0 as OPUS can use variable length audio frames
 
-                size &= 0x1fff  # isolate the size from the terminator
+                size &= 0x1FFF  # isolate the size from the terminator
             else:
-                (header,) = struct.unpack("!B", message[pos:pos + 1])  # CELT length and terminator is encoded in a 1 byte int
+                (header,) = struct.unpack(
+                    "!B", message[pos : pos + 1]
+                )  # CELT length and terminator is encoded in a 1 byte int
                 if not (header & 0b10000000):
                     terminator = True
                 size = header & 0b01111111
                 pos += 1
 
-            self.Log.debug("Audio frame : time:%f, last:%s, size:%i, type:%i, target:%i, pos:%i", time.time(), str(terminator), size, type, target, pos - 1)
+            self.Log.debug(
+                "Audio frame : time:%f, last:%s, size:%i, type:%i, target:%i, pos:%i",
+                time.time(),
+                str(terminator),
+                size,
+                type,
+                target,
+                pos - 1,
+            )
 
             if size > 0:
                 try:
-                    newsound = self.users[session.value].sound.add(message[pos:pos + size],
-                                                                   sequence.value,
-                                                                   type,
-                                                                   target)  # add the sound to the user's sound queue
+                    newsound = self.users[session.value].sound.add(
+                        message[pos : pos + size], sequence.value, type, target
+                    )  # add the sound to the user's sound queue
 
-                    if newsound is None:  # In case audio have been disable for specific users
+                    if (
+                        newsound is None
+                    ):  # In case audio have been disable for specific users
                         return
 
-                    self.callbacks(PYMUMBLE_CLBK_SOUNDRECEIVED, self.users[session.value], newsound)
+                    self.callbacks(
+                        PYMUMBLE_CLBK_SOUNDRECEIVED, self.users[session.value], newsound
+                    )
 
-                    sequence.value += int(round(newsound.duration / 1000 * 10))  # add 1 sequence per 10ms of audio
+                    sequence.value += int(
+                        round(newsound.duration / 1000 * 10)
+                    )  # add 1 sequence per 10ms of audio
 
-                    self.Log.debug("Audio frame : time:%f last:%s, size:%i, uncompressed:%i, type:%i, target:%i", time.time(), str(terminator), size, newsound.size, type, target)
+                    self.Log.debug(
+                        "Audio frame : time:%f last:%s, size:%i, uncompressed:%i, type:%i, target:%i",
+                        time.time(),
+                        str(terminator),
+                        size,
+                        newsound.size,
+                        type,
+                        target,
+                    )
                 except CodecNotSupportedError as msg:
                     print(msg)
                 except KeyError:  # sound received after user removed
@@ -717,9 +862,13 @@ class Mumble(threading.Thread):
             if "plugin_context" in cmd.parameters:
                 userstate.plugin_context = cmd.parameters["plugin_context"]
             if "listening_channel_add" in cmd.parameters:
-                userstate.listening_channel_add.extend(cmd.parameters["listening_channel_add"])
+                userstate.listening_channel_add.extend(
+                    cmd.parameters["listening_channel_add"]
+                )
             if "listening_channel_remove" in cmd.parameters:
-                userstate.listening_channel_remove.extend(cmd.parameters["listening_channel_remove"])
+                userstate.listening_channel_remove.extend(
+                    cmd.parameters["listening_channel_remove"]
+                )
 
             self.send_message(PYMUMBLE_MSG_TYPES_USERSTATE, userstate)
             cmd.response = True
@@ -746,35 +895,35 @@ class Mumble(threading.Thread):
 
             for msg_group in cmd.parameters["chan_group"]:
                 chan_group = mumble_pb2.ACL.ChanGroup()
-                chan_group.name = msg_group['name']
-                if msg_group['inherited'] is not None:
-                    chan_group.inherited = msg_group['inherited']
-                if msg_group['inherit'] is not None:
-                    chan_group.inherit = msg_group['inherit']
-                if msg_group['inheritable'] is not None:
-                    chan_group.inheritable = msg_group['inheritable']
-                for add_id in msg_group['add']:
+                chan_group.name = msg_group["name"]
+                if msg_group["inherited"] is not None:
+                    chan_group.inherited = msg_group["inherited"]
+                if msg_group["inherit"] is not None:
+                    chan_group.inherit = msg_group["inherit"]
+                if msg_group["inheritable"] is not None:
+                    chan_group.inheritable = msg_group["inheritable"]
+                for add_id in msg_group["add"]:
                     chan_group.add.append(add_id)
-                for remove_id in msg_group['remove']:
+                for remove_id in msg_group["remove"]:
                     chan_group.remove.append(remove_id)
                 acl.groups.append(chan_group)
 
             for msg_acl in cmd.parameters["chan_acl"]:
                 chan_acl = mumble_pb2.ACL.ChanACL()
-                if msg_acl['apply_here'] is not None:
-                    chan_acl.apply_here = msg_acl['apply_here']
-                if msg_acl['apply_subs'] is not None:
-                    chan_acl.apply_subs = msg_acl['apply_subs']
-                if msg_acl['inherited'] is not None:
-                    chan_acl.inherited = msg_acl['inherited']
-                if msg_acl['user_id'] is not None:
-                    chan_acl.user_id = msg_acl['user_id']
-                if msg_acl['group'] is not None:
-                    chan_acl.group = msg_acl['group']
-                if msg_acl['grant'] is not None:
-                    chan_acl.grant = msg_acl['grant']
-                if msg_acl['deny'] is not None:
-                    chan_acl.deny = msg_acl['deny']
+                if msg_acl["apply_here"] is not None:
+                    chan_acl.apply_here = msg_acl["apply_here"]
+                if msg_acl["apply_subs"] is not None:
+                    chan_acl.apply_subs = msg_acl["apply_subs"]
+                if msg_acl["inherited"] is not None:
+                    chan_acl.inherited = msg_acl["inherited"]
+                if msg_acl["user_id"] is not None:
+                    chan_acl.user_id = msg_acl["user_id"]
+                if msg_acl["group"] is not None:
+                    chan_acl.group = msg_acl["group"]
+                if msg_acl["grant"] is not None:
+                    chan_acl.grant = msg_acl["grant"]
+                if msg_acl["deny"] is not None:
+                    chan_acl.deny = msg_acl["deny"]
 
                 if not chan_acl.inherited:
                     acl.acls.append(chan_acl)
