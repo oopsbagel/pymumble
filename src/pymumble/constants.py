@@ -3,7 +3,7 @@
 import platform
 import sys
 
-PYMUMBLE_VERSION = "1.7"
+PYMUMBLE_VERSION = "2.0.0"
 
 # ============================================================================
 # Tunable parameters
@@ -18,13 +18,9 @@ PYMUMBLE_LOOP_RATE = 0.01  # pause done between two iteration of the main loop o
 # Constants
 # ============================================================================
 PYMUMBLE_PROTOCOL_VERSION = (1, 4, 287)
-PYMUMBLE_VERSION_STRING = "PyMumble %s" % PYMUMBLE_VERSION
-PYMUMBLE_OS_STRING = "PyMumble %s" % PYMUMBLE_VERSION
-PYMUMBLE_OS_VERSION_STRING = "Python %s - %s %s" % (
-    sys.version,
-    platform.system(),
-    platform.release(),
-)
+PYMUMBLE_VERSION_STRING = "pymumble %s" % PYMUMBLE_VERSION
+PYMUMBLE_OS_STRING = platform.system() + " " + platform.machine()
+PYMUMBLE_OS_VERSION_STRING = "Python %s" % platform.python_version()
 
 PYMUMBLE_PING_DELAY = 10  # interval between 2 pings in sec
 
