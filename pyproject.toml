@@ -10,7 +10,7 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "opuslib==3.0.1",
-    "protobuf==3.20.3",
+    "protobuf>=5.29.2",
 ]
 classifiers=[
     "Programming Language :: Python :: 3",
