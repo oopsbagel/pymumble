@@ -22,50 +22,15 @@ from .crypto import ocb_encrypt, ocb_decrypt
 
 @pytest.fixture()
 def rawkey():
-    return bytes(
-        (
-            0x00,
-            0x01,
-            0x02,
-            0x03,
-            0x04,
-            0x05,
-            0x06,
-            0x07,
-            0x08,
-            0x09,
-            0x0A,
-            0x0B,
-            0x0C,
-            0x0D,
-            0x0E,
-            0x0F,
-        )
-    )
+    return bytes(range(0x10))
 
 
 @pytest.fixture()
 def nonce():
-    return bytes(
-        (
-            0xFF,
-            0xEE,
-            0xDD,
-            0xCC,
-            0xBB,
-            0xAA,
-            0x99,
-            0x88,
-            0x77,
-            0x66,
-            0x55,
-            0x44,
-            0x33,
-            0x22,
-            0x11,
-            0x00,
-        )
-    )
+    # fmt: off
+    return bytes((0xFF,0xEE,0xDD,0xCC,0xBB,0xAA,0x99,0x88,0x77,0x66,0x55,0x44,
+                  0x33,0x22,0x11,0x00))
+    # fmt: on
 
 
 def test_reverserecovery():
@@ -97,7 +62,7 @@ def test_reverserecovery():
     crypted = [enc.encrypt(secret) for _ in range(512)]
 
     for crypt in crypted:
-        decr = dec.decrypt(crypt, len(secret))
+        dec.decrypt(crypt, len(secret))
     for crypt in crypted:
         with pytest.raises(DecryptFailedException):
             dec.decrypt(crypt, len(secret))
@@ -161,96 +126,24 @@ def test_testvectors(rawkey):
 
     _, tag = ocb_encrypt(cs._aes, bytes(), rawkey)
 
-    blanktag = bytes(
-        (
-            0xBF,
-            0x31,
-            0x08,
-            0x13,
-            0x07,
-            0x73,
-            0xAD,
-            0x5E,
-            0xC7,
-            0x0E,
-            0xC6,
-            0x9E,
-            0x78,
-            0x75,
-            0xA7,
-            0xB0,
-        )
-    )
+    # fmt: off
+    blanktag = bytes((0xBF,0x31,0x08,0x13,0x07,0x73,0xAD,0x5E,0xC7,0x0E,0xC6,0x9E,
+                      0x78,0x75,0xA7,0xB0))
+    # fmt: on
     assert len(blanktag) == AES_BLOCK_SIZE
 
     assert tag == blanktag
 
     source = bytes(range(40))
     crypt, tag = ocb_encrypt(cs._aes, source, rawkey)
-    longtag = bytes(
-        (
-            0x9D,
-            0xB0,
-            0xCD,
-            0xF8,
-            0x80,
-            0xF7,
-            0x3E,
-            0x3E,
-            0x10,
-            0xD4,
-            0xEB,
-            0x32,
-            0x17,
-            0x76,
-            0x66,
-            0x88,
-        )
-    )
-    crypted = bytes(
-        (
-            0xF7,
-            0x5D,
-            0x6B,
-            0xC8,
-            0xB4,
-            0xDC,
-            0x8D,
-            0x66,
-            0xB8,
-            0x36,
-            0xA2,
-            0xB0,
-            0x8B,
-            0x32,
-            0xA6,
-            0x36,
-            0x9F,
-            0x1C,
-            0xD3,
-            0xC5,
-            0x22,
-            0x8D,
-            0x79,
-            0xFD,
-            0x6C,
-            0x26,
-            0x7F,
-            0x5F,
-            0x6A,
-            0xA7,
-            0xB2,
-            0x31,
-            0xC7,
-            0xDF,
-            0xB9,
-            0xD5,
-            0x99,
-            0x51,
-            0xAE,
-            0x9C,
-        )
-    )
+    # fmt: off
+    longtag = bytes((0x9D,0xB0,0xCD,0xF8,0x80,0xF7,0x3E,0x3E,0x10,0xD4,0xEB,0x32,
+                     0x17,0x76,0x66,0x88))
+    crypted = bytes((0xF7,0x5D,0x6B,0xC8,0xB4,0xDC,0x8D,0x66,0xB8,0x36,0xA2,0xB0,
+                     0x8B,0x32,0xA6,0x36,0x9F,0x1C,0xD3,0xC5,0x22,0x8D,0x79,0xFD,
+                     0x6C,0x26,0x7F,0x5F,0x6A,0xA7,0xB2,0x31,0xC7,0xDF,0xB9,0xD5,
+                     0x99,0x51,0xAE,0x9C))
+    # fmt: on
 
     assert tag == longtag
     assert crypt[: len(crypted)] == crypted
@@ -314,4 +207,50 @@ def test_tamper(rawkey, nonce):
         with pytest.raises(DecryptFailedException):
             cs.decrypt(encrypted, len(msg))
         encrypted[i // 8] ^= 1 << (i % 8)
-    decrypted = cs.decrypt(encrypted, len(msg))
+    cs.decrypt(encrypted, len(msg))
+
+
+@pytest.mark.parametrize(
+    "message, ciphertext, tag",
+    [
+        (b"", "", "BF3108130773AD5EC70EC69E7875A7B0"),
+        (bytes(range(8)), "C636B3A868F429BB", "A45F5FDEA5C088D1D7C8BE37CABC8C5C"),
+        (
+            bytes(range(16)),
+            "52E48F5D19FE2D9869F0C4A4B3D2BE57",
+            "F7EE49AE7AA5B5E6645DB6B3966136F9",
+        ),
+        (
+            bytes(range(24)),
+            "F75D6BC8B4DC8D66B836A2B08B32A636CC579E145D323BEB",
+            "A1A50F822819D6E0A216784AC24AC84C",
+        ),
+        (
+            bytes(range(32)),
+            "F75D6BC8B4DC8D66B836A2B08B32A636CEC3C555037571709DA25E1BB0421A27",
+            "09CA6C73F0B5C6C5FD587122D75F2AA3",
+        ),
+        (
+            bytes(range(40)),
+            "F75D6BC8B4DC8D66B836A2B08B32A6369F1CD3C5228D79FD6C267F5F6AA7B231C7DFB9D59951AE9C",
+            "9DB0CDF880F73E3E10D4EB3217766688",
+        ),
+    ],
+)
+def test_krovetz_test_vectors(message, ciphertext, tag):
+    """
+    Test vectors defined in OCB2 Internet-Draft
+    https://web.cs.ucdavis.edu/~rogaway/papers/draft-krovetz-ocb-00.txt
+    """
+    cs = CryptStateOCB2()
+    key = bytes(range(0x10))
+    nonce = bytes(range(0x10))
+    cs.set_key(key, nonce, nonce)
+
+    ec, et = ocb_encrypt(cs._aes, message, key)
+    assert ec.hex().upper() == ciphertext
+    assert et.hex().upper() == tag
+
+    dm, dt = ocb_decrypt(cs._aes, ec, key, len(message))
+    assert dm.hex().upper() == message.hex().upper()
+    assert dt.hex().upper() == tag

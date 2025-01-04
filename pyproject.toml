@@ -11,6 +11,8 @@ requires-python = ">=3.12"
 dependencies = [
     "opuslib==3.0.1",
     "protobuf>=5.29.2",
+    "pycryptodome>=3.21.0",
+    "pytest>=8.3.4",
 ]
 classifiers=[
     "Programming Language :: Python :: 3",
@@ -21,3 +23,13 @@ classifiers=[
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+# Exclude protoc generated source files.
+exclude = ["*_pb2.py"]
+
+[tool.pytest.ini_options]
+pythonpath = "src/pymumble"
+addopts = [
+    "--import-mode=importlib",
+]

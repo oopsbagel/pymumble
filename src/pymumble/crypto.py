@@ -287,6 +287,8 @@ def ocb_encrypt(
     checksum = xor(checksum, plain_block)
     encrypted_block = xor(pad, plain_block)
     encrypted[pos:] = encrypted_block
+    # The ciphertext core must be the same length as the message.
+    encrypted = encrypted[: len(plain)]
 
     delta = xor(delta, S2(delta))
     tag = aes.encrypt(xor(delta, checksum))
