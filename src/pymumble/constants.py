@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import platform
-import sys
+from enum import IntEnum
 
 PYMUMBLE_VERSION = "2.0.0"
 
@@ -64,6 +64,13 @@ PYMUMBLE_MSG_TYPES_CODECVERSION = 21
 PYMUMBLE_MSG_TYPES_USERSTATS = 22
 PYMUMBLE_MSG_TYPES_REQUESTBLOB = 23
 PYMUMBLE_MSG_TYPES_SERVERCONFIG = 24
+
+
+# Mumble data message types
+class PYMUMBLE_UDP_MSG_TYPES(IntEnum):
+    Audio = 0
+    Ping = 1
+
 
 # callbacks names
 PYMUMBLE_CLBK_CONNECTED = "connected"

@@ -6,6 +6,7 @@ import select
 import socket
 import ssl
 import struct
+import google.protobuf.message as protobuf_message
 
 from .errors import *
 from .constants import *
@@ -17,6 +18,7 @@ from . import callbacks
 from . import tools
 
 from . import mumble_pb2
+from . import mumbleudp_pb2
 
 
 def _wrap_socket(
@@ -48,6 +50,134 @@ def _wrap_socket(
                 cert_reqs=verify_mode,
                 ssl_version=ssl.PROTOCOL_TLSv1,
             )
+
+
+class ServerInfo:
+    "Store latency and extended server information for unauthenticated servers"
+
+    host: str
+    port: int
+    socket: socket.socket
+    latency: int
+    version: str
+    max_user_count: int
+    max_bandwith_per_user: int
+    user_count: int
+    last_ping_sent: time.time
+    last_ping_recv: time.time
+
+    def __init__(self, host, port):
+        self.host = host
+        self.port = port
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket.connect((host, port))
+        self.last_ping_sent = 0
+
+
+class MumbleUDPServerInfo(threading.Thread):
+    """Manage unencrypted pings to retrieve server latency and extendend information.
+
+    Register servers with add_server(host, port).
+    Sends an unencrypted UDP ping every PYMUMBLE_PING_DELAY seconds.
+    Records server information in servers dict indexed by (host, port) tuples.
+    Remove servers with delete_server(host, port).
+
+    Automatically runs the thread when a server is registered."""
+
+    def __init__(self, debug=False):
+        threading.Thread.__init__(self, name="MumbleUDPServerInfoThread", daemon=True)
+        self._active = False  # semaphore for whether to allow run() to terminate
+        self.servers = {}
+
+        self.Log = logging.getLogger("PyMumbleUDPServerInfo")
+        if debug:
+            self.Log.setLevel(logging.DEBUG)
+        sh = logging.StreamHandler()
+        sh.setLevel(logging.DEBUG)
+        formatter = logging.Formatter("%(asctime)s-%(name)s-%(levelname)s-%(message)s")
+        sh.setFormatter(formatter)
+        self.Log.addHandler(sh)
+
+    def add_server(self, host: str, port: int = 64738):
+        if not self._active:
+            self._active = True
+            self.start()
+        self.servers[(host, port)] = ServerInfo(host, port)
+
+    def delete_server(self, host: str, port: int = 64738):
+        del self.servers[(host, port)]
+
+    def stop(self):
+        "Stop the thread without deleting the recorded data."
+        self._active = False
+
+    def _ping_server(self, host: str, port: int = 64738):
+        ping = mumbleudp_pb2.Ping(
+            timestamp=int(time.time()), request_extended_information=True
+        )
+        msg = struct.pack("!B", PYMUMBLE_UDP_MSG_TYPES.Ping) + ping.SerializeToString()
+        self.Log.debug("pinging %s %s" % (host, port))
+        server = self.servers[(host, port)]
+        server.socket.sendto(msg, (host, port))
+
+    def _receive_ping(self, ping: PYMUMBLE_UDP_MSG_TYPES.Ping, server: ServerInfo):
+        server.last_ping_recv = int(time.time() * 1000)
+        server.latency = server.last_ping_recv - int(server.last_ping_sent * 1000)
+        server.version = ping.server_version_v2
+        server.user_count = ping.user_count
+        server.max_user_count = ping.max_user_count
+        server.max_bandwidth_per_user = ping.max_bandwidth_per_user
+
+    def run(self):
+        while self._active:
+            sockets = []
+            for server in self.servers.values():
+                sockets.append(server.socket)
+                if server.last_ping_sent + PYMUMBLE_PING_DELAY <= time.time():
+                    self._ping_server(server.host, server.port)
+                    server.last_ping_sent = time.time()
+
+            (rlist, wlist, xlist) = select.select(
+                sockets, [], sockets, PYMUMBLE_LOOP_RATE
+            )
+            for sock in rlist:
+                self._read_udp_message(sock)
+            for sock in xlist:
+                for server in self.servers.values():
+                    if server.socket is sock:
+                        self.delete_server(server.host, server.port)
+
+    def _read_udp_message(self, sock: socket.socket):
+        try:
+            buffer = sock.recv(PYMUMBLE_READ_BUFFER_SIZE)
+        except socket.error as e:
+            self.Log.warn("error reading from socket: %s" % e)
+            return
+
+        header, message = (
+            buffer[0],
+            buffer[1:],
+        )  # No need to unpack the header as a single byte is already an int in python.
+        try:
+            msgtype = PYMUMBLE_UDP_MSG_TYPES(header)
+        except ValueError:
+            self.Log.warn("received UDP message of unknown type, ignoring")
+            return
+
+        match msgtype:
+            case PYMUMBLE_UDP_MSG_TYPES.Audio:
+                self.Log.debug("message: UDP Audio : must be encrypted")
+
+            case PYMUMBLE_UDP_MSG_TYPES.Ping:
+                ping = mumbleudp_pb2.Ping()
+                try:
+                    ping.ParseFromString(message)
+                except protobuf_message.DecodeError as e:
+                    self.Log.warn("unable to decode message as UDP Ping: %s" % e)
+                    return
+                self.Log.debug("message: UDP Ping : %s" % ping)
+                server = self.servers[sock.getpeername()]
+                self._receive_ping(ping, server)
 
 
 class Mumble(threading.Thread):
