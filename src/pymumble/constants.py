@@ -17,7 +17,7 @@ PYMUMBLE_LOOP_RATE = 0.01  # pause done between two iteration of the main loop o
 # ============================================================================
 # Constants
 # ============================================================================
-PYMUMBLE_PROTOCOL_VERSION = (1, 4, 287)
+PYMUMBLE_PROTOCOL_VERSION = (1, 5, 735)
 PYMUMBLE_VERSION_STRING = "pymumble %s" % PYMUMBLE_VERSION
 PYMUMBLE_OS_STRING = platform.system() + " " + platform.machine()
 PYMUMBLE_OS_VERSION_STRING = "Python %s" % platform.python_version()
@@ -31,6 +31,7 @@ PYMUMBLE_SEQUENCE_RESET_INTERVAL = 5  # in sec
 PYMUMBLE_READ_BUFFER_SIZE = (
     4096  # how much bytes to read at a time from the control socket, in bytes
 )
+PYMUMBLE_MAX_UDP_PACKET_SIZE = 1024  # from the official C++ implementation
 
 # client connection state
 PYMUMBLE_CONN_STATE_NOT_CONNECTED = 0

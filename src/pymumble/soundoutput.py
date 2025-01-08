@@ -8,8 +8,9 @@ import opuslib
 
 from .constants import *
 from .errors import CodecNotSupportedError
-from .tools import VarInt
 from .messages import VoiceTarget
+
+from . import MumbleUDP_pb2
 
 
 class SoundOutput:
@@ -119,47 +120,36 @@ class SoundOutput:
 
                 audio_encoded += self.encoder_framesize
 
-                # create the audio frame header
-                if self.codec_type == PYMUMBLE_AUDIO_TYPE_OPUS:
-                    frameheader = VarInt(len(encoded)).encode()
-                else:
-                    frameheader = len(encoded)
-                    if (
-                        audio_encoded < self.audio_per_packet and len(self.pcm) > 0
-                    ):  # if not last frame for the packet, set the terminator bit
-                        frameheader += 1 << 7
-                    frameheader = struct.pack("!B", frameheader)
-
-                payload += frameheader + encoded  # add the frame to the packet
-
-            header = self.codec_type << 5  # encapsulate in audio packet
-            sequence = VarInt(self.sequence).encode()
-
-            udppacket = struct.pack("!B", header | self.target) + sequence + payload
-            if self.mumble_object.positional:
-                udppacket += struct.pack(
-                    "fff",
-                    self.mumble_object.positional[0],
-                    self.mumble_object.positional[1],
-                    self.mumble_object.positional[2],
-                )
+                payload += encoded  # add the frame to the packet
 
             self.Log.debug(
                 "audio packet to send: sequence:{sequence}, type:{type}, length:{len}".format(
-                    sequence=self.sequence, type=self.codec_type, len=len(udppacket)
+                    sequence=self.sequence, type=self.codec_type, len=len(payload)
                 )
             )
 
-            tcppacket = (
-                struct.pack("!HL", PYMUMBLE_MSG_TYPES_UDPTUNNEL, len(udppacket))
-                + udppacket
-            )  # encapsulate in tcp tunnel
+            audio_pb = MumbleUDP_pb2.Audio()
+            audio_pb.target = self.target
+            audio_pb.frame_number = self.sequence
+            audio_pb.opus_data = bytes(payload)
+            if self.mumble_object.positional:
+                audio_pb.positional_data = self.mumble_object.positional
+            msg = (
+                struct.pack("!B", PYMUMBLE_UDP_MSG_TYPES.Audio)
+                + audio_pb.SerializeToString()
+            )
 
-            while len(tcppacket) > 0:
-                sent = self.mumble_object.control_socket.send(tcppacket)
-                if sent < 0:
-                    raise socket.error("Server socket error")
-                tcppacket = tcppacket[sent:]
+            if self.mumble_object.force_tcp_only:
+                tcppacket = (
+                    struct.pack("!HL", PYMUMBLE_MSG_TYPES_UDPTUNNEL, len(msg)) + msg
+                )
+                while len(tcppacket) > 0:
+                    sent = self.mumble_object.control_socket.send(tcppacket)
+                    if sent < 0:
+                        raise socket.error("Server socket error")
+                    tcppacket = tcppacket[sent:]
+            else:
+                self.mumble_object.udp_thread.encrypt_and_send(msg)
 
     def get_audio_per_packet(self):
         """return the configured length of a audio packet (in ms)"""

@@ -1,5 +1,7 @@
 """
-OCB2 crypto, broadly following the implementation from Mumble
+OCB2-AES128 cryptography, broadly following the implementation from Mumble
+
+OCB is in the public domain: https://web.cs.ucdavis.edu/~rogaway/ocb/license.htm
 """
 
 from typing import Tuple

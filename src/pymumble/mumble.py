@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import annotations
 import threading
 import logging
 import time
@@ -7,18 +8,19 @@ import socket
 import ssl
 import struct
 import google.protobuf.message as protobuf_message
+from typing import Optional
 
 from .errors import *
 from .constants import *
+from .crypto import CryptStateOCB2
 from . import users
 from . import channels
 from . import blobs
 from . import commands
 from . import callbacks
-from . import tools
 
 from . import mumble_pb2
-from . import mumbleudp_pb2
+from . import MumbleUDP_pb2
 
 
 def _wrap_socket(
@@ -154,10 +156,13 @@ class MumbleUDPServerInfo(threading.Thread):
             self.Log.warn("error reading from socket: %s" % e)
             return
 
+        if len(buffer) < 2:  # This datagram is too short to be a MumbleUDP.Ping.
+            return
+
         header, message = (
             buffer[0],
             buffer[1:],
-        )  # No need to unpack the header as a single byte is already an int in python.
+        )  # No need to unpack the header as a single byte is automatically cast to int in Python.
         try:
             msgtype = PYMUMBLE_UDP_MSG_TYPES(header)
         except ValueError:
@@ -180,6 +185,133 @@ class MumbleUDPServerInfo(threading.Thread):
                 self._receive_ping(ping, server)
 
 
+class MumbleUDP(threading.Thread):
+    def __init__(
+        self,
+        mumble: Mumble,
+        key: bytes,
+        client_nonce: bytearray,
+        server_nonce: bytearray,
+        host: str,
+        port: int = 64738,
+        debug=False,
+    ):
+        threading.Thread.__init__(self, name="MumbleUDPThread", daemon=True)
+        self._active = True  # semaphore for whether to allow run() to terminate
+        self._last_ping_sent = 0
+        self._mumble = mumble
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.connect((host, port))
+        self._crypt = CryptStateOCB2()
+        self._crypt.set_key(key, client_nonce, server_nonce)
+
+        self.log = logging.getLogger("PyMumbleUDP")
+        formatter = logging.Formatter("%(asctime)s-%(name)s-%(levelname)s-%(message)s")
+        if debug:
+            self.log.setLevel(logging.DEBUG)
+        sh = logging.StreamHandler()
+        sh.setLevel(logging.DEBUG)
+        sh.setFormatter(formatter)
+        self.log.addHandler(sh)
+
+    def _ping(self):
+        ping = MumbleUDP_pb2.Ping(timestamp=int(time.time()))
+        msg = struct.pack("!B", PYMUMBLE_UDP_MSG_TYPES.Ping) + ping.SerializeToString()
+        self.log.debug("sending encrypted ping: %s", msg.hex)
+        self.encrypt_and_send(msg)
+
+    def _read_message(self):
+        try:
+            buffer = self._socket.recv(PYMUMBLE_MAX_UDP_PACKET_SIZE)
+        except socket.error as e:
+            self.log.warn("error reading from udp encrypted socket: %s" % e)
+            return
+        if len(buffer) < 4:
+            self.log.debug("udp encrypted message is too short: %s" % e)
+            return
+        try:
+            plaintext = self._crypt.decrypt(
+                buffer, len(buffer) - 4
+            )  # OCB2 header is 4 bytes
+        except DecryptFailedException as e:
+            self.log.warn("error decrypting udp packet: %s" % e)
+            return
+        msg = MumbleUDP.decode_message(self.log, plaintext)
+        match type(msg):
+            case MumbleUDP_pb2.Audio:
+                MumbleUDP.receive_audio(self._mumble, msg)
+            case MumbleUDP_pb2.Ping:
+                return
+
+    def run(self):
+        while self._active:
+            if self._last_ping_sent + PYMUMBLE_PING_DELAY <= time.time():
+                self._ping()
+                self._last_ping_sent = time.time()
+
+            (rlist, _, xlist) = select.select(
+                [self._socket], [], [self._socket], PYMUMBLE_LOOP_RATE
+            )
+            if self._socket in rlist:
+                self._read_message()
+            elif self._socket in xlist:
+                self.log.warn("socket in xlist")
+
+    def encrypt_and_send(self, plaintext: bytes) -> int:
+        """Encrypt message with the server's AES key in OCB2 mode and send the ciphertext via the UDP socket.
+
+        :param plaintext: Bytes containing the protobuf encoded message.
+
+        :return: Number of bytes written to socket.
+        """
+        ciphertext = self._crypt.encrypt(plaintext)
+        return self._socket.send(ciphertext)
+
+    @staticmethod
+    def decode_message(
+        log: logging.Logger, plaintext: bytes
+    ) -> Optional[MumbleUDP_pb2.Audio | MumbleUDP_pb2.Ping]:
+        """Decode an unencrypted MumbleUDP protobuf message.
+
+        :param log: Configured logging.Logger object.
+        :param plaintext: Bytes containing a decrypted MumbleUDP protobuf message.
+
+        :return: A decoded protobuf message object ``Audio``, ``Ping``, or ``None``.
+        """
+        header, message = plaintext[0], plaintext[1:]
+        try:
+            msgtype = PYMUMBLE_UDP_MSG_TYPES(header)
+        except ValueError:
+            log.warn("received UDP message of unknown type, ignoring")
+            return
+
+        MsgClass = getattr(MumbleUDP_pb2, msgtype.name)
+        decoded_msg = MsgClass()
+        try:
+            decoded_msg.ParseFromString(message)
+        except protobuf_message.DecodeError as e:
+            log.warn("unable to decode message as UDP %s: %s" % (msgtype.name, e))
+            return
+        log.debug(f"message: UDP {msgtype.name} : {decoded_msg}")
+        return decoded_msg
+
+    @staticmethod
+    def receive_audio(mumble: Mumble, audio: MumbleUDP_pb2.Audio):
+        """Add received audio to sending user's soundqueue and call SOUNDRECEIVED callback.
+
+        :param mumble: The ``mumble.Mumble`` object containing the users dict and callback table.
+        :param audio: The decoded protobuf message containing opus encoded audio and metadata.
+        """
+        newsound = mumble.users[audio.sender_session].sound.add(
+            audio.opus_data, audio.frame_number, PYMUMBLE_AUDIO_TYPE_OPUS, audio.context
+        )
+        if newsound is None:  # audio has been disabled for this user
+            return
+        mumble.callbacks(
+            PYMUMBLE_CLBK_SOUNDRECEIVED, mumble.users[audio.sender_session], newsound
+        )
+
+
 class Mumble(threading.Thread):
     """
     Mumble client library main object.
@@ -200,6 +332,7 @@ class Mumble(threading.Thread):
         debug=False,
         client_type=0,
         receive_sound=True,
+        force_tcp_only=False,
         loop_rate=PYMUMBLE_LOOP_RATE,
         application=PYMUMBLE_VERSION_STRING,
     ):
@@ -219,7 +352,6 @@ class Mumble(threading.Thread):
         loop_rate=main loop rate (pause per iteration) in seconds
         application=application name viewable by other clients on the server
         """
-        # TODO: use UDP audio
         threading.Thread.__init__(self)
 
         if tokens is None:
@@ -257,6 +389,9 @@ class Mumble(threading.Thread):
         self.receive_sound = receive_sound
         self.loop_rate = loop_rate
         self.application = application
+        self.debug = debug
+        self.force_tcp_only = force_tcp_only
+        self.udp_thread = None
 
         if stereo:
             self.Log.debug("Working in STEREO mode.")
@@ -523,7 +658,6 @@ class Mumble(threading.Thread):
 
     def read_control_messages(self):
         """Read control messages coming from the server"""
-        # from tools import tohex  # for debugging
 
         try:
             buffer = self.control_socket.recv(PYMUMBLE_READ_BUFFER_SIZE)
@@ -543,7 +677,7 @@ class Mumble(threading.Thread):
             if len(self.receive_buffer) < size + 6:  # if not length data, read further
                 break
 
-            # self.Log.debug("message received : " + tohex(self.receive_buffer[0:size+6]))  # for debugging
+            # self.Log.debug("message received : " + self.receive_buffer[0:size+6].hex())  # for debugging
 
             message = self.receive_buffer[6 : size + 6]  # get the control message
             self.receive_buffer = self.receive_buffer[
@@ -558,6 +692,7 @@ class Mumble(threading.Thread):
         if (
             type == PYMUMBLE_MSG_TYPES_UDPTUNNEL
         ):  # audio encapsulated in control message
+            self.Log.debug("message: UDPTunnel : %s", message)
             if self.sound_output:
                 self.sound_received(message)
 
@@ -663,7 +798,17 @@ class Mumble(threading.Thread):
             mess = mumble_pb2.CryptSetup()
             mess.ParseFromString(message)
             self.Log.debug("message: CryptSetup : %s", mess)
-            self.ping()
+            if not self.force_tcp_only:
+                self.udp_thread = MumbleUDP(
+                    self,
+                    mess.key,
+                    bytearray(mess.client_nonce),
+                    bytearray(mess.server_nonce),
+                    host=self.host,
+                    port=self.port,
+                    debug=self.debug,
+                )
+                self.udp_thread.start()
 
         elif type == PYMUMBLE_MSG_TYPES_CONTEXTACTIONMODIFY:
             mess = mumble_pb2.ContextActionModify()
@@ -739,107 +884,24 @@ class Mumble(threading.Thread):
                 self.bandwidth
             )  # communicate the update to the outgoing audio manager
 
-    def sound_received(self, message):
-        """Manage a received sound message"""
-        # from tools import tohex  # for debugging
-
-        pos = 0
-
-        # self.Log.debug("sound packet : " + tohex(message))  # for debugging
-        (header,) = struct.unpack("!B", bytes([message[pos]]))  # extract the header
-        type = (header & 0b11100000) >> 5
-        target = header & 0b00011111
-        pos += 1
-
-        if type == PYMUMBLE_AUDIO_TYPE_PING:
-            return
-
-        session = tools.VarInt()  # decode session id
-        pos += session.decode(message[pos : pos + 10])
-
-        sequence = tools.VarInt()  # decode sequence number
-        pos += sequence.decode(message[pos : pos + 10])
-
-        self.Log.debug(
-            "audio packet received from %i, sequence %i, type:%i, target:%i, length:%i",
-            session.value,
-            sequence.value,
-            type,
-            target,
-            len(message),
-        )
-
-        terminator = False  # set to true if it's the last 10 ms audio frame for the packet (used with CELT codec)
-        while (
-            pos < len(message)
-        ) and not terminator:  # get the audio frames one by one
-            if type == PYMUMBLE_AUDIO_TYPE_OPUS:
-                size = tools.VarInt()  # OPUS use varint for the frame length
-
-                pos += size.decode(message[pos : pos + 10])
-                size = size.value
-
-                if not (size & 0x2000):  # terminator is 0x2000 in the resulting int.
-                    terminator = True  # should actually always be 0 as OPUS can use variable length audio frames
-
-                size &= 0x1FFF  # isolate the size from the terminator
-            else:
-                (header,) = struct.unpack(
-                    "!B", message[pos : pos + 1]
-                )  # CELT length and terminator is encoded in a 1 byte int
-                if not (header & 0b10000000):
-                    terminator = True
-                size = header & 0b01111111
-                pos += 1
-
-            self.Log.debug(
-                "Audio frame : time:%f, last:%s, size:%i, type:%i, target:%i, pos:%i",
-                time.time(),
-                str(terminator),
-                size,
-                type,
-                target,
-                pos - 1,
-            )
-
-            if size > 0:
-                try:
-                    newsound = self.users[session.value].sound.add(
-                        message[pos : pos + size], sequence.value, type, target
-                    )  # add the sound to the user's sound queue
-
-                    if (
-                        newsound is None
-                    ):  # In case audio have been disable for specific users
-                        return
-
-                    self.callbacks(
-                        PYMUMBLE_CLBK_SOUNDRECEIVED, self.users[session.value], newsound
-                    )
-
-                    sequence.value += int(
-                        round(newsound.duration / 1000 * 10)
-                    )  # add 1 sequence per 10ms of audio
-
-                    self.Log.debug(
-                        "Audio frame : time:%f last:%s, size:%i, uncompressed:%i, type:%i, target:%i",
-                        time.time(),
-                        str(terminator),
-                        size,
-                        newsound.size,
-                        type,
-                        target,
-                    )
-                except CodecNotSupportedError as msg:
-                    print(msg)
-                except KeyError:  # sound received after user removed
-                    pass
-
-                #            if len(message) - pos < size:
-                #                raise InvalidFormatError("Invalid audio frame size")
-
-            pos += size  # go further in the packet, after the audio frame
-        # TODO: get position info
+    def sound_received(self, plaintext):
+        """Receive a plaintext UDPTunneled MumbleUDP message"""
+        msg = MumbleUDP.decode_message(self.Log, plaintext)
+        match type(msg):
+            case MumbleUDP_pb2.Audio:
+                audio = msg
+                self.Log.debug(
+                    "audio packet received from %i, sequence %i, type:%i, target:%i, length:%i, terminator:%s",
+                    audio.sender_session,
+                    audio.frame_number,
+                    PYMUMBLE_AUDIO_TYPE_OPUS,
+                    audio.context,
+                    len(audio.opus_data),
+                    audio.is_terminator,
+                )
+                MumbleUDP.receive_audio(self, audio)
+            case MumbleUDP_pb2.Ping:
+                return
 
     def set_codec_profile(self, profile):
         """set the audio profile"""
