@@ -63,7 +63,7 @@ class ServerInfo:
     latency: int
     version: str
     max_user_count: int
-    max_bandwith_per_user: int
+    max_bandwidth_per_user: int
     user_count: int
     last_ping_sent: time.time
     last_ping_recv: time.time
@@ -71,7 +71,8 @@ class ServerInfo:
     def __init__(self, host, port):
         self.host = host
         self.port = port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server_family = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][0]
+        self.socket = socket.socket(server_family, socket.SOCK_DGRAM)
         self.socket.connect((host, port))
         self.last_ping_sent = 0
 
@@ -104,23 +105,24 @@ class MumbleUDPServerInfo(threading.Thread):
         if not self._active:
             self._active = True
             self.start()
-        self.servers[(host, port)] = ServerInfo(host, port)
+        server = ServerInfo(host, port)
+        self.servers[server.socket.getpeername()] = server
 
     def delete_server(self, host: str, port: int = 64738):
-        del self.servers[(host, port)]
+        addrinfo = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][4]
+        del self.servers[addrinfo]
 
     def stop(self):
         "Stop the thread without deleting the recorded data."
         self._active = False
 
-    def _ping_server(self, host: str, port: int = 64738):
-        ping = mumbleudp_pb2.Ping(
+    def _ping_server(self, server: ServerInfo):
+        ping = MumbleUDP_pb2.Ping(
             timestamp=int(time.time()), request_extended_information=True
         )
         msg = struct.pack("!B", PYMUMBLE_UDP_MSG_TYPES.Ping) + ping.SerializeToString()
-        self.Log.debug("pinging %s %s" % (host, port))
-        server = self.servers[(host, port)]
-        server.socket.sendto(msg, (host, port))
+        self.Log.debug("pinging %s %s" % (server.host, server.port))
+        server.socket.sendto(msg, (server.host, server.port))
 
     def _receive_ping(self, ping: PYMUMBLE_UDP_MSG_TYPES.Ping, server: ServerInfo):
         server.last_ping_recv = int(time.time() * 1000)
@@ -136,7 +138,7 @@ class MumbleUDPServerInfo(threading.Thread):
             for server in self.servers.values():
                 sockets.append(server.socket)
                 if server.last_ping_sent + PYMUMBLE_PING_DELAY <= time.time():
-                    self._ping_server(server.host, server.port)
+                    self._ping_server(server)
                     server.last_ping_sent = time.time()
 
             (rlist, wlist, xlist) = select.select(
@@ -174,7 +176,7 @@ class MumbleUDPServerInfo(threading.Thread):
                 self.Log.debug("message: UDP Audio : must be encrypted")
 
             case PYMUMBLE_UDP_MSG_TYPES.Ping:
-                ping = mumbleudp_pb2.Ping()
+                ping = MumbleUDP_pb2.Ping()
                 try:
                     ping.ParseFromString(message)
                 except protobuf_message.DecodeError as e:
@@ -197,11 +199,12 @@ class MumbleUDP(threading.Thread):
         debug=False,
     ):
         threading.Thread.__init__(self, name="MumbleUDPThread", daemon=True)
+        self._host = host
+        self._port = port
         self._active = True  # semaphore for whether to allow run() to terminate
         self._last_ping_sent = 0
         self._mumble = mumble
-        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._socket.connect((host, port))
+        self._socket = None
         self._crypt = CryptStateOCB2()
         self._crypt.set_key(key, client_nonce, server_nonce)
 
@@ -244,6 +247,10 @@ class MumbleUDP(threading.Thread):
                 return
 
     def run(self):
+        server_family = socket.getaddrinfo(self._host, self._port, type=socket.SOCK_DGRAM)[0][0]
+        self._socket = socket.socket(server_family, socket.SOCK_DGRAM)
+        self._socket.connect((self._host, self._port))
+
         while self._active:
             if self._last_ping_sent + PYMUMBLE_PING_DELAY <= time.time():
                 self._ping()
