@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
-import pymumble
+import mumble
 import time
 
-mumble_server_info = pymumble.mumble.MumbleUDPServerInfo(debug=True)
+mumble_server_info = mumble.MumbleUDPServerInfo(debug=True)
 mumble_server_info.add_server("127.0.0.1", 64738)
 mumble_server_info.add_server("::1")
 time.sleep(20)

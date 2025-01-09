@@ -2,9 +2,9 @@
 # This bot sends any sound it receives back to where it has come from.
 # WARNING! Don't put two bots in the same place!
 
-import pymumble
 import time
-from pymumble.callbacks import PYMUMBLE_CLBK_SOUNDRECEIVED as PCS
+from mumble import Mumble
+from mumble.callbacks import PYMUMBLE_CLBK_SOUNDRECEIVED as PCS
 
 pwd = ""  # password
 server = "localhost"
@@ -16,7 +16,7 @@ def sound_received_handler(user, soundchunk):
     mumble.sound_output.add_sound(soundchunk.pcm)
 
 
-mumble = pymumble.Mumble(server, nick, password=pwd)
+mumble = Mumble(server, nick, password=pwd)
 mumble.callbacks.set_callback(PCS, sound_received_handler)
 mumble.start()
 

@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
-import pymumble
 import subprocess as sp
 import time
 import argparse
+from mumble import Mumble
 
 parser = argparse.ArgumentParser(description="get parameters.")
 
@@ -20,7 +20,7 @@ nick = args.name
 passwd = args.passwd
 port = args.port
 
-mumble = pymumble.Mumble(server, nick, password=passwd, port=port)
+mumble = Mumble(server, nick, password=passwd, port=port)
 mumble.start()
 mumble.is_ready()  # wait for Mumble to get ready to avoid errors after startup
 

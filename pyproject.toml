@@ -29,7 +29,10 @@ build-backend = "hatchling.build"
 exclude = ["*_pb2.py"]
 
 [tool.pytest.ini_options]
-pythonpath = "src/pymumble"
+pythonpath = "src/mumble"
 addopts = [
     "--import-mode=importlib",
 ]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mumble"]
