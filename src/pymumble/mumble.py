@@ -110,7 +110,8 @@ class MumbleUDPServerInfo(threading.Thread):
 
     def delete_server(self, host: str, port: int = 64738):
         addrinfo = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][4]
-        del self.servers[addrinfo]
+        if addrinfo in self.servers:
+            del self.servers[addrinfo]
 
     def stop(self):
         "Stop the thread without deleting the recorded data."
