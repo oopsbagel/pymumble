@@ -72,6 +72,10 @@ class PYMUMBLE_UDP_MSG_TYPES(IntEnum):
     Audio = 0
     Ping = 1
 
+class ClientType(IntEnum):
+    Regular = 0
+    Bot = 1
+
 
 # callbacks names
 PYMUMBLE_CLBK_CONNECTED = "connected"

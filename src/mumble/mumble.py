@@ -65,8 +65,8 @@ class ServerInfo:
     max_user_count: int
     max_bandwidth_per_user: int
     user_count: int
-    last_ping_sent: time.time
-    last_ping_recv: time.time
+    last_ping_sent: float
+    last_ping_recv: float
 
     def __init__(self, host, port):
         self.host = host
@@ -249,7 +249,9 @@ class MumbleUDP(threading.Thread):
                 return
 
     def run(self):
-        server_family = socket.getaddrinfo(self._host, self._port, type=socket.SOCK_DGRAM)[0][0]
+        server_family = socket.getaddrinfo(
+            self._host, self._port, type=socket.SOCK_DGRAM
+        )[0][0]
         self._socket = socket.socket(server_family, socket.SOCK_DGRAM)
         self._socket.connect((self._host, self._port))
 
@@ -324,47 +326,46 @@ class MumbleUDP(threading.Thread):
 class Mumble(threading.Thread):
     """
     Mumble client library main object.
-    basically a thread
+
+    :param host: The Mumble server domain name or IP address.
+    :param user: The username to display when connected to the Mumble server.
+    :param port: The Mumble server port.
+    :param password: The Mumble server password.
+    :param certfile: Path to a Mumble client certificate in `.pem` format.
+    :param keyfile: Path to a private key for the Mumble client certificate in `.pem` format.
+    :param application: Application name to send to the server.
+    :param reconnect: Reconnect if disconnected.
+    :param tokens: List of channel access tokens.
+    :param stereo: Send stereo audio.
+    :param client_type: 0 = regular, 1 = bot.
+    :param enable_audio: Send/receive audio.
+    :param force_tcp_only: Disable UDP audio/pings and tunnel audio messages through the TCP control channel.
+    :param loop_rate: Client tick rate in seconds.
+    :param debug: Send debugging messages to `stdout`.
     """
 
     def __init__(
         self,
-        host,
-        user,
-        port=64738,
-        password="",
-        certfile=None,
-        keyfile=None,
-        reconnect=False,
-        tokens=None,
-        stereo=False,
-        debug=False,
-        client_type=0,
-        enable_audio=True,
-        force_tcp_only=False,
-        loop_rate=PYMUMBLE_LOOP_RATE,
-        application=PYMUMBLE_VERSION_STRING,
+        host: str,
+        user: str,
+        port: int = 64738,
+        password: Optional[str] = None,
+        certfile: Optional[str] = None,
+        keyfile: Optional[str] = None,
+        application: str = PYMUMBLE_VERSION_STRING,
+        client_type: int = 0,
+        tokens: Optional[list[str]] = None,
+        enable_audio: bool = True,
+        stereo: bool = False,
+        reconnect: bool = False,
+        force_tcp_only: bool = False,
+        loop_rate: float = PYMUMBLE_LOOP_RATE,
+        debug: bool = False,
     ):
-        """
-        host=mumble server hostname or address
-        port=mumble server port
-        user=user to use for the connection
-        password=password for the connection
-        certfile=client certificate to authenticate the connection
-        keyfile=private key associated with the client certificate
-        reconnect=if True, try to reconnect if disconnected
-        tokens=channel access tokens as a list of strings
-        stereo=enable stereo transmission
-        debug=if True, send debugging messages (lot of...) to the stdout
-        client_type=if 1, flag connection as bot
-        enable_audio=if True, handle incoming/outgoing audio
-        loop_rate=main loop rate (pause per iteration) in seconds
-        application=application name viewable by other clients on the server
-        """
         threading.Thread.__init__(self)
 
-        if tokens is None:
-            tokens = []
+        self.client_type = ClientType(client_type)  # raise ValueError on invalid ClientType
+
         self.Log = logging.getLogger(
             "PyMumble"
         )  # logging object for errors and debugging
@@ -554,8 +555,10 @@ class Mumble(threading.Thread):
 
             authenticate = mumble_pb2.Authenticate()
             authenticate.username = self.user
-            authenticate.password = self.password
-            authenticate.tokens.extend(self.tokens)
+            if self.password:
+                authenticate.password = self.password
+            if self.tokens:
+                authenticate.tokens.extend(self.tokens)
             authenticate.opus = True
             authenticate.client_type = self.client_type
             self.Log.debug("sending: authenticate: %s", authenticate)
