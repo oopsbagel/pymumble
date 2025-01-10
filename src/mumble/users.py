@@ -63,7 +63,7 @@ class User(dict):
         self["channel_id"] = 0
         self.update(message)
 
-        if mumble_object.receive_sound:
+        if mumble_object.enable_audio:
             from . import soundqueue
 
             self.sound = soundqueue.SoundQueue(

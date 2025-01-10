@@ -243,7 +243,8 @@ class MumbleUDP(threading.Thread):
         msg = MumbleUDP.decode_message(self.log, plaintext)
         match type(msg):
             case MumbleUDP_pb2.Audio:
-                MumbleUDP.receive_audio(self._mumble, msg)
+                if self._mumble.enable_audio:
+                    MumbleUDP.receive_audio(self._mumble, msg)
             case MumbleUDP_pb2.Ping:
                 return
 
@@ -339,7 +340,7 @@ class Mumble(threading.Thread):
         stereo=False,
         debug=False,
         client_type=0,
-        receive_sound=True,
+        enable_audio=True,
         force_tcp_only=False,
         loop_rate=PYMUMBLE_LOOP_RATE,
         application=PYMUMBLE_VERSION_STRING,
@@ -356,7 +357,7 @@ class Mumble(threading.Thread):
         stereo=enable stereo transmission
         debug=if True, send debugging messages (lot of...) to the stdout
         client_type=if 1, flag connection as bot
-        receive_sound=if True, handle incoming audio
+        enable_audio=if True, handle incoming/outgoing audio
         loop_rate=main loop rate (pause per iteration) in seconds
         application=application name viewable by other clients on the server
         """
@@ -394,7 +395,7 @@ class Mumble(threading.Thread):
         self.__opus_profile = PYMUMBLE_AUDIO_TYPE_OPUS_PROFILE
         self.stereo = stereo
         self.client_type = client_type
-        self.receive_sound = receive_sound
+        self.enable_audio = enable_audio
         self.loop_rate = loop_rate
         self.application = application
         self.debug = debug
@@ -441,7 +442,7 @@ class Mumble(threading.Thread):
             self, self.callbacks
         )  # contains the server's channels information
         self.blobs = blobs.Blobs(self)  # manage the blob objects
-        if self.receive_sound:
+        if self.enable_audio:
             from . import soundoutput
 
             self.sound_output = soundoutput.SoundOutput(
@@ -701,7 +702,7 @@ class Mumble(threading.Thread):
             type == PYMUMBLE_MSG_TYPES_UDPTUNNEL
         ):  # audio encapsulated in control message
             self.Log.debug("message: UDPTunnel : %s", message)
-            if self.sound_output:
+            if self.enable_audio and self.sound_output:
                 self.sound_received(message)
 
         elif type == PYMUMBLE_MSG_TYPES_VERSION:
