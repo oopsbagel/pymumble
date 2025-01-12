@@ -69,7 +69,7 @@ mumble.is_ready()  # Wait for client is ready
 # constant capturing sound and sending it to mumble server
 while True:
     data = stream.read(CHUNK, exception_on_overflow=False)
-    mumble.sound_output.add_sound(data)
+    mumble.send_audio.add_sound(data)
 
 
 # close the stream and pyaudio instance

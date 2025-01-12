@@ -467,9 +467,9 @@ class Mumble(threading.Thread):
         )  # contains the server's channels information
         self.blobs = blobs.Blobs(self)  # manage the blob objects
         if self.enable_audio:
-            from . import soundoutput
+            from sendaudio import SendAudio
 
-            self.sound_output = soundoutput.SoundOutput(
+            self.send_audio = SendAudio(
                 self,
                 AUDIO_PER_PACKET,
                 self.bandwidth,
@@ -477,7 +477,7 @@ class Mumble(threading.Thread):
                 opus_profile=self.__opus_profile,
             )  # manage the outgoing sounds
         else:
-            self.sound_output = None
+            self.send_audio = None
         self.commands = (
             commands.Commands()
         )  # manage commands sent between the main and the mumble threads
@@ -621,8 +621,8 @@ class Mumble(threading.Thread):
                         self.commands.pop_cmd()
                     )  # send the commands coming from the application to the server
 
-                if self.sound_output:
-                    self.sound_output.send_audio()  # send outgoing audio if available
+                if self.send_audio:
+                    self.send_audio.send_audio()  # send outgoing audio if available
 
             (rlist, wlist, xlist) = select.select(
                 [self.control_socket], [], [self.control_socket], self.loop_rate
@@ -721,7 +721,7 @@ class Mumble(threading.Thread):
         self.Log.debug("dispatch control message")
         if type == TCP_MSG_TYPE.UDPTunnel:  # audio encapsulated in control message
             self.Log.debug("message: UDPTunnel : %s", message)
-            if self.enable_audio and self.sound_output:
+            if self.enable_audio and self.send_audio:
                 self.sound_received(message)
 
         elif type == TCP_MSG_TYPE.Version:
@@ -869,8 +869,8 @@ class Mumble(threading.Thread):
             mess = mumble_pb2.CodecVersion()
             mess.ParseFromString(message)
             self.Log.debug("message: CodecVersion : %s", mess)
-            if self.sound_output:
-                self.sound_output.set_default_codec(mess)
+            if self.send_audio:
+                self.send_audio.set_default_codec(mess)
 
         elif type == TCP_MSG_TYPE.UserStats:
             mess = mumble_pb2.UserStats()
@@ -907,8 +907,8 @@ class Mumble(threading.Thread):
         else:
             self.bandwidth = bandwidth
 
-        if self.sound_output:
-            self.sound_output.set_bandwidth(
+        if self.send_audio:
+            self.send_audio.set_bandwidth(
                 self.bandwidth
             )  # communicate the update to the outgoing audio manager
 

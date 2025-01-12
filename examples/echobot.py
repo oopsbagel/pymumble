@@ -12,7 +12,7 @@ nick = "Bob"
 
 def sound_received_handler(user, soundchunk):
     # sending the received sound back to server
-    mumble.sound_output.add_sound(soundchunk.pcm)
+    mumble.send_audio.add_sound(soundchunk.pcm)
 
 
 mumble = Mumble(server, nick, password=pwd)

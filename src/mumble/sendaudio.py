@@ -21,7 +21,7 @@ from .messages import VoiceTarget
 from . import MumbleUDP_pb2
 
 
-class SoundOutput:
+class SendAudio:
     """
     Class managing the sounds that must be sent to the server (best sent in a multiple of audio_per_packet samples)
     The buffering is the responsibility of the caller, any partial sound will be sent without delay

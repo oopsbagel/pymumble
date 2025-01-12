@@ -23,4 +23,4 @@ while s:
         command, stdout=sp.PIPE, stderr=sp.DEVNULL, stdin=wave_file
     ).stdout.read()
     # sending speech to server
-    mumble.sound_output.add_sound(sound)
+    mumble.send_audio.add_sound(sound)
