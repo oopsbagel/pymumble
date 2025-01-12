@@ -6,7 +6,15 @@ import threading
 import socket
 import opuslib
 
-from .constants import *
+from .constants import (
+    AUDIO_CODEC,
+    OPUS_PROFILE,
+    SAMPLE_RATE,
+    SEQUENCE_DURATION,
+    SEQUENCE_RESET_INTERVAL,
+    TCP_MSG_TYPE,
+    UDP_MSG_TYPE,
+)
 from .errors import CodecNotSupportedError
 from .messages import VoiceTarget
 
@@ -25,7 +33,7 @@ class SoundOutput:
         audio_per_packet,
         bandwidth,
         stereo=False,
-        opus_profile=PYMUMBLE_AUDIO_TYPE_OPUS_PROFILE,
+        opus_profile=OPUS_PROFILE,
     ):
         """
         audio_per_packet=packet audio duration in sec
@@ -62,7 +70,7 @@ class SoundOutput:
             return ()
 
         samples = int(
-            self.encoder_framesize * PYMUMBLE_SAMPLERATE * 2 * self.channels
+            self.encoder_framesize * SAMPLE_RATE * 2 * self.channels
         )  # number of samples in an encoder frame
 
         while (
@@ -71,8 +79,7 @@ class SoundOutput:
         ):  # audio to send and time to send it (since last packet)
             current_time = time()
             if (
-                self.sequence_last_time + PYMUMBLE_SEQUENCE_RESET_INTERVAL
-                <= current_time
+                self.sequence_last_time + SEQUENCE_RESET_INTERVAL <= current_time
             ):  # waited enough, resetting sequence to 0
                 self.sequence = 0
                 self.sequence_start_time = current_time
@@ -82,16 +89,15 @@ class SoundOutput:
             ):  # give some slack (2*audio_per_frame) before interrupting a continuous sequence
                 # calculating sequence after a pause
                 self.sequence = int(
-                    (current_time - self.sequence_start_time)
-                    / PYMUMBLE_SEQUENCE_DURATION
+                    (current_time - self.sequence_start_time) / SEQUENCE_DURATION
                 )
                 self.sequence_last_time = self.sequence_start_time + (
-                    self.sequence * PYMUMBLE_SEQUENCE_DURATION
+                    self.sequence * SEQUENCE_DURATION
                 )
             else:  # continuous sound
-                self.sequence += int(self.audio_per_packet / PYMUMBLE_SEQUENCE_DURATION)
+                self.sequence += int(self.audio_per_packet / SEQUENCE_DURATION)
                 self.sequence_last_time = self.sequence_start_time + (
-                    self.sequence * PYMUMBLE_SEQUENCE_DURATION
+                    self.sequence * SEQUENCE_DURATION
                 )
 
             payload = (
@@ -134,15 +140,10 @@ class SoundOutput:
             audio_pb.opus_data = bytes(payload)
             if self.mumble_object.positional:
                 audio_pb.positional_data = self.mumble_object.positional
-            msg = (
-                struct.pack("!B", PYMUMBLE_UDP_MSG_TYPES.Audio)
-                + audio_pb.SerializeToString()
-            )
+            msg = struct.pack("!B", UDP_MSG_TYPE.Audio) + audio_pb.SerializeToString()
 
             if self.mumble_object.force_tcp_only:
-                tcppacket = (
-                    struct.pack("!HL", PYMUMBLE_MSG_TYPES_UDPTUNNEL, len(msg)) + msg
-                )
+                tcppacket = struct.pack("!HL", TCP_MSG_TYPE.UDPTunnel, len(msg)) + msg
                 while len(tcppacket) > 0:
                     sent = self.mumble_object.control_socket.send(tcppacket)
                     if sent < 0:
@@ -201,7 +202,7 @@ class SoundOutput:
             raise Exception("pcm data must be 16 bits")
 
         samples = int(
-            self.encoder_framesize * PYMUMBLE_SAMPLERATE * 2 * self.channels
+            self.encoder_framesize * SAMPLE_RATE * 2 * self.channels
         )  # number of samples in an encoder frame
 
         self.lock.acquire()
@@ -221,12 +222,7 @@ class SoundOutput:
 
     def get_buffer_size(self):
         """return the size of the unsent buffer in sec"""
-        return (
-            sum(len(chunk) for chunk in self.pcm)
-            / 2.0
-            / PYMUMBLE_SAMPLERATE
-            / self.channels
-        )
+        return sum(len(chunk) for chunk in self.pcm) / 2.0 / SAMPLE_RATE / self.channels
 
     def set_default_codec(self, codecversion):
         """Set the default codec to be used to send packets"""
@@ -240,10 +236,10 @@ class SoundOutput:
 
         if self.codec.opus:
             self.encoder = opuslib.Encoder(
-                PYMUMBLE_SAMPLERATE, self.channels, self.opus_profile
+                SAMPLE_RATE, self.channels, self.opus_profile
             )
             self.encoder_framesize = self.audio_per_packet
-            self.codec_type = PYMUMBLE_AUDIO_TYPE_OPUS
+            self.codec_type = AUDIO_CODEC.OPUS
         else:
             raise CodecNotSupportedError("")
 

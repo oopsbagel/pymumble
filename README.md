@@ -72,11 +72,13 @@ The following enhancements are included in pymumble 2.0.0:
 In order to bring pymumble up to date with modern python development practices, the following breaking changes have been introduced in version 2.0.0:
 
 - Change the import path from `pymumble_py3` to simply `mumble`.
+- Change callback constants to an enum. e.g., `PYMUMBLE_CLBK_SOUNDRECEIVED` is now `CALLBACK.SOUND_RECEIVED`.
 - Remove `Mumble.set_receive_sound()`, audio support is now enabled by default.
   - To disable audio support and avoid importing `opuslib`, instantiate the `Mumble` object with `Mumble(enable_audio=False)`.
   - To disable audio support after the object has been created set `m = Mumble(); m.enable_audio = False`. This will still import `opuslib`.
 - The `Mumble` class getter/setter functions `set_application_string()`, `set_loop_rate()`, and `get_loop_rate()` have been removed. These parameters can be set in the `Mumble` object initializer and queried and changed by accessing the object's `application` and `loop_rate` public attributes.
 - Drop support for legacy audio codecs.
+- Rename all constants to drop the `PYMUMBLE_` prefix, some also renamed for clarity.
 
 Because pymumble now follows the [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) versioning scheme, any further breaking changes must increment the MAJOR version number. The dependency
 ```

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .constants import *
+from .constants import CALLBACK, TCP_MSG_TYPE
 from .errors import TextTooLongError, ImageTooBigError
 from threading import Lock
 from . import messages
@@ -23,12 +23,12 @@ class Users(dict):
 
         if message.session not in self:
             self[message.session] = User(self.mumble_object, message)
-            self.callbacks(PYMUMBLE_CLBK_USERCREATED, self[message.session])
+            self.callbacks(CALLBACK.USER_CREATED, self[message.session])
             if message.session == self.myself_session:
                 self.myself = self[message.session]
         else:
             actions = self[message.session].update(message)
-            self.callbacks(PYMUMBLE_CLBK_USERUPDATED, self[message.session], actions)
+            self.callbacks(CALLBACK.USER_UPDATED, self[message.session], actions)
 
         self.lock.release()
 
@@ -39,7 +39,7 @@ class Users(dict):
         if message.session in self:
             user = self[message.session]
             del self[message.session]
-            self.callbacks(PYMUMBLE_CLBK_USERREMOVED, user, message)
+            self.callbacks(CALLBACK.USER_REMOVED, user, message)
 
         self.lock.release()
 
@@ -230,9 +230,7 @@ class User(dict):
             authenticate.tokens.extend([token])
             authenticate.opus = True
             self.mumble_object.Log.debug("sending: authenticate: %s", authenticate)
-            self.mumble_object.send_message(
-                PYMUMBLE_MSG_TYPES_AUTHENTICATE, authenticate
-            )
+            self.mumble_object.send_message(TCP_MSG_TYPE.Authenticate, authenticate)
 
         session = self.mumble_object.users.myself_session
         cmd = messages.MoveCmd(session, channel_id)

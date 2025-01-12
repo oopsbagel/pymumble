@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import struct
 
-from .constants import *
+from .constants import TCP_MSG_TYPE
 from .mumble_pb2 import RequestBlob
 
 
@@ -20,7 +20,7 @@ class Blobs(dict):
         request = RequestBlob()
         request.session_comment.extend(struct.unpack("!5I", hash))
 
-        self.mumble_object.send_message(PYMUMBLE_MSG_TYPES_REQUESTBLOB, request)
+        self.mumble_object.send_message(TCP_MSG_TYPE.RequestBlob, request)
 
     def get_user_texture(self, hash):
         """Request the image of a user"""
@@ -30,7 +30,7 @@ class Blobs(dict):
         request = RequestBlob()
         request.session_texture.extend(struct.unpack("!5I", hash))
 
-        self.mumble_object.send_message(PYMUMBLE_MSG_TYPES_REQUESTBLOB, request)
+        self.mumble_object.send_message(TCP_MSG_TYPE.RequestBlob, request)
 
     def get_channel_description(self, hash):
         """Request the description/comment of a channel"""
@@ -40,4 +40,4 @@ class Blobs(dict):
         request = RequestBlob()
         request.channel_description.extend(struct.unpack("!5I", hash))
 
-        self.mumble_object.send_message(PYMUMBLE_MSG_TYPES_REQUESTBLOB, request)
+        self.mumble_object.send_message(TCP_MSG_TYPE.RequestBlob, request)

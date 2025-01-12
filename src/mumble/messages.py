@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .constants import *
+from .constants import TCP_MSG_TYPE, CMD
 from threading import Lock
 
 
@@ -24,7 +24,7 @@ class MoveCmd(Cmd):
     def __init__(self, session, channel_id):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_MOVE
+        self.cmd = CMD.MOVE
         self.parameters = {"session": session, "channel_id": channel_id}
 
 
@@ -34,7 +34,7 @@ class TextMessage(Cmd):
     def __init__(self, session, channel_id, message):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_TEXTMESSAGE
+        self.cmd = CMD.TEXT_MESSAGE
         self.parameters = {
             "session": session,
             "channel_id": channel_id,
@@ -48,7 +48,7 @@ class TextPrivateMessage(Cmd):
     def __init__(self, session, message):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_TEXTPRIVATEMESSAGE
+        self.cmd = CMD.TEXT_PRIVATE_MESSAGE
         self.parameters = {"session": session, "message": message}
 
 
@@ -58,7 +58,7 @@ class ModUserState(Cmd):
     def __init__(self, session, params):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_MODUSERSTATE
+        self.cmd = CMD.MOD_USER_STATE
         self.parameters = params
 
 
@@ -68,7 +68,7 @@ class RemoveUser(Cmd):
     def __init__(self, session, params):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_REMOVEUSER
+        self.cmd = CMD.REMOVE_USER
         self.parameters = params
 
 
@@ -78,7 +78,7 @@ class CreateChannel(Cmd):
     def __init__(self, parent, name, temporary):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_MSG_TYPES_CHANNELSTATE
+        self.cmd = TCP_MSG_TYPE.ChannelState
         self.parameters = {"parent": parent, "name": name, "temporary": temporary}
 
 
@@ -88,7 +88,7 @@ class RemoveChannel(Cmd):
     def __init__(self, channel_id):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_MSG_TYPES_CHANNELREMOVE
+        self.cmd = TCP_MSG_TYPE.ChannelRemove
         self.parameters = {"channel_id": channel_id}
 
 
@@ -98,7 +98,7 @@ class UpdateChannel(Cmd):
     def __init__(self, params):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_UPDATECHANNEL
+        self.cmd = CMD.UPDATE_CHANNEL
         self.parameters = params
 
 
@@ -108,7 +108,7 @@ class VoiceTarget(Cmd):
     def __init__(self, voice_id, targets):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_MSG_TYPES_VOICETARGET
+        self.cmd = TCP_MSG_TYPE.VoiceTarget
         self.parameters = {"id": voice_id, "targets": targets}
 
 
@@ -118,7 +118,7 @@ class LinkChannel(Cmd):
     def __init__(self, params):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_LINKCHANNEL
+        self.cmd = CMD.LINK_CHANNEL
         self.parameters = params
 
 
@@ -128,7 +128,7 @@ class UnlinkChannel(Cmd):
     def __init__(self, params):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_UNLINKCHANNEL
+        self.cmd = CMD.UNLINK_CHANNEL
         self.parameters = params
 
 
@@ -138,7 +138,7 @@ class QueryACL(Cmd):
     def __init__(self, channel_id):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_QUERYACL
+        self.cmd = CMD.QUERY_ACL
         self.parameters = {"channel_id": channel_id}
 
 
@@ -148,7 +148,7 @@ class UpdateACL(Cmd):
     def __init__(self, channel_id, inherit_acls, chan_group, chan_acl):
         Cmd.__init__(self)
 
-        self.cmd = PYMUMBLE_CMD_UPDATEACL
+        self.cmd = CMD.UPDATE_ACL
         self.parameters = {
             "channel_id": channel_id,
             "inherit_acls": inherit_acls,

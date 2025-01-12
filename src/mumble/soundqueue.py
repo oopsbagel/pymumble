@@ -5,7 +5,13 @@ from collections import deque
 
 import opuslib
 
-from .constants import *
+from .constants import (
+    AUDIO_CODEC,
+    CALLBACK,
+    SAMPLE_RATE,
+    SEQUENCE_DURATION,
+    TCP_READ_BUFFER_SIZE,
+)
 
 
 class SoundQueue:
@@ -27,9 +33,7 @@ class SoundQueue:
 
         # to be sure, create every supported decoders for all users
         # sometime, clients still use a codec for a while after server request another...
-        self.decoders = {
-            PYMUMBLE_AUDIO_TYPE_OPUS: opuslib.Decoder(PYMUMBLE_SAMPLERATE, 1)
-        }
+        self.decoders = {AUDIO_CODEC.OPUS: opuslib.Decoder(SAMPLE_RATE, 1)}
 
     def set_receive_sound(self, value):
         """Define if received sounds must be kept or discarded in this specific queue (user)"""
@@ -46,7 +50,7 @@ class SoundQueue:
         self.lock.acquire()
 
         try:
-            pcm = self.decoders[type].decode(audio, PYMUMBLE_READ_BUFFER_SIZE)
+            pcm = self.decoders[type].decode(audio, TCP_READ_BUFFER_SIZE)
 
             if not self.start_sequence or sequence <= self.start_sequence:
                 # New sequence started
@@ -57,16 +61,14 @@ class SoundQueue:
                 # calculating position in current sequence
                 calculated_time = (
                     self.start_time
-                    + (sequence - self.start_sequence) * PYMUMBLE_SEQUENCE_DURATION
+                    + (sequence - self.start_sequence) * SEQUENCE_DURATION
                 )
 
             newsound = SoundChunk(
                 pcm, sequence, len(pcm), calculated_time, type, target
             )
 
-            if not self.mumble_object.callbacks.get_callback(
-                PYMUMBLE_CLBK_SOUNDRECEIVED
-            ):
+            if not self.mumble_object.callbacks.get_callback(CALLBACK.SOUND_RECEIVED):
                 self.queue.appendleft(newsound)
 
                 if len(self.queue) > 1 and self.queue[0].time < self.queue[1].time:
@@ -137,13 +139,13 @@ class SoundChunk:
         self.pcm = pcm  # audio data
         self.sequence = sequence  # sequence of the packet
         self.size = size  # size
-        self.duration = float(size) / 2 / PYMUMBLE_SAMPLERATE  # duration in sec
+        self.duration = float(size) / 2 / SAMPLE_RATE  # duration in sec
         self.type = type  # type of the audio (codec)
         self.target = target  # target of the audio
 
     def extract_sound(self, duration):
         """Extract part of the chunk, leaving a valid chunk for the remaining part"""
-        size = int(duration * 2 * PYMUMBLE_SAMPLERATE)
+        size = int(duration * 2 * SAMPLE_RATE)
         result = SoundChunk(
             self.pcm[:size],
             self.sequence,

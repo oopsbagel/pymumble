@@ -1,114 +1,127 @@
 # -*- coding: utf-8 -*-
 
 import platform
-from enum import IntEnum
+from enum import Enum, IntEnum, auto
 
-PYMUMBLE_VERSION = "2.0.0"
+VERSION = "2.0.0"
 
 # ============================================================================
 # Tunable parameters
 # ============================================================================
-PYMUMBLE_CONNECTION_RETRY_INTERVAL = 10  # in sec
-PYMUMBLE_AUDIO_PER_PACKET = float(20) / 1000  # size of one audio packet in sec
-PYMUMBLE_BANDWIDTH = 50 * 1000  # total outgoing bitrate in bit/seconds
-PYMUMBLE_LOOP_RATE = 0.01  # pause done between two iteration of the main loop of the mumble thread, in sec
-# should be small enough to manage the audio output, so smaller than PYMUMBLE_AUDIO_PER_PACKET
+CONNECTION_RETRY_INTERVAL = 10  # in sec
+AUDIO_PER_PACKET = float(20) / 1000  # size of one audio packet in sec
+BANDWIDTH = 50 * 1000  # total outgoing bitrate in bit/seconds
 
 # ============================================================================
 # Constants
 # ============================================================================
-PYMUMBLE_PROTOCOL_VERSION = (1, 5, 735)
-PYMUMBLE_VERSION_STRING = "pymumble %s" % PYMUMBLE_VERSION
-PYMUMBLE_OS_STRING = platform.system() + " " + platform.machine()
-PYMUMBLE_OS_VERSION_STRING = "Python %s" % platform.python_version()
+PROTOCOL_VERSION = (1, 5, 735)
+VERSION_STRING = "pymumble %s" % VERSION
+OS_STRING = platform.system() + " " + platform.machine()
+OS_VERSION_STRING = "Python %s" % platform.python_version()
 
-PYMUMBLE_PING_DELAY = 10  # interval between 2 pings in sec
+PING_INTERVAL = 10  # interval between 2 pings in sec
 
-PYMUMBLE_SAMPLERATE = 48000  # in hz
+SAMPLE_RATE = 48000  # in hz
 
-PYMUMBLE_SEQUENCE_DURATION = float(10) / 1000  # in sec
-PYMUMBLE_SEQUENCE_RESET_INTERVAL = 5  # in sec
-PYMUMBLE_READ_BUFFER_SIZE = (
+SEQUENCE_DURATION = float(10) / 1000  # in sec
+SEQUENCE_RESET_INTERVAL = 5  # in sec
+TCP_READ_BUFFER_SIZE = (
     4096  # how much bytes to read at a time from the control socket, in bytes
 )
-PYMUMBLE_MAX_UDP_PACKET_SIZE = 1024  # from the official C++ implementation
+MAX_UDP_PACKET_SIZE = 1024  # from the official C++ implementation
+
+OPUS_PROFILE = "audio"  # "voip"
+
 
 # client connection state
-PYMUMBLE_CONN_STATE_NOT_CONNECTED = 0
-PYMUMBLE_CONN_STATE_AUTHENTICATING = 1
-PYMUMBLE_CONN_STATE_CONNECTED = 2
-PYMUMBLE_CONN_STATE_FAILED = 3
-
-# Mumble control messages types
-PYMUMBLE_MSG_TYPES_VERSION = 0
-PYMUMBLE_MSG_TYPES_UDPTUNNEL = 1
-PYMUMBLE_MSG_TYPES_AUTHENTICATE = 2
-PYMUMBLE_MSG_TYPES_PING = 3
-PYMUMBLE_MSG_TYPES_REJECT = 4
-PYMUMBLE_MSG_TYPES_SERVERSYNC = 5
-PYMUMBLE_MSG_TYPES_CHANNELREMOVE = 6
-PYMUMBLE_MSG_TYPES_CHANNELSTATE = 7
-PYMUMBLE_MSG_TYPES_USERREMOVE = 8
-PYMUMBLE_MSG_TYPES_USERSTATE = 9
-PYMUMBLE_MSG_TYPES_BANLIST = 10
-PYMUMBLE_MSG_TYPES_TEXTMESSAGE = 11
-PYMUMBLE_MSG_TYPES_PERMISSIONDENIED = 12
-PYMUMBLE_MSG_TYPES_ACL = 13
-PYMUMBLE_MSG_TYPES_QUERYUSERS = 14
-PYMUMBLE_MSG_TYPES_CRYPTSETUP = 15
-PYMUMBLE_MSG_TYPES_CONTEXTACTIONMODIFY = 16
-PYMUMBLE_MSG_TYPES_CONTEXTACTION = 17
-PYMUMBLE_MSG_TYPES_USERLIST = 18
-PYMUMBLE_MSG_TYPES_VOICETARGET = 19
-PYMUMBLE_MSG_TYPES_PERMISSIONQUERY = 20
-PYMUMBLE_MSG_TYPES_CODECVERSION = 21
-PYMUMBLE_MSG_TYPES_USERSTATS = 22
-PYMUMBLE_MSG_TYPES_REQUESTBLOB = 23
-PYMUMBLE_MSG_TYPES_SERVERCONFIG = 24
+class CONN_STATE(IntEnum):
+    NOT_CONNECTED = 0
+    AUTHENTICATING = 1
+    CONNECTED = 2
+    FAILED = 3
 
 
-# Mumble data message types
-class PYMUMBLE_UDP_MSG_TYPES(IntEnum):
+class TCP_MSG_TYPE(IntEnum):
+    "Mumble control message types. These names must exactly match the Protocol Buffer Message names."
+
+    Version = 0
+    UDPTunnel = 1
+    Authenticate = 2
+    Ping = 3
+    Reject = 4
+    ServerSync = 5
+    ChannelRemove = 6
+    ChannelState = 7
+    UserRemove = 8
+    UserState = 9
+    BanList = 10
+    TextMessage = 11
+    PermissionDenied = 12
+    ACL = 13
+    QueryUsers = 14
+    CryptSetup = 15
+    ContextActionModify = 16
+    ContextAction = 17
+    UserList = 18
+    VoiceTarget = 19
+    PermissionQuery = 20
+    CodecVersion = 21
+    UserStats = 22
+    RequestBlob = 23
+    ServerConfig = 24
+    SuggestConfig = 25
+    PluginDataTransmission = 26
+
+
+class UDP_MSG_TYPE(IntEnum):
+    "Mumble data message types. These names must exactly match the Protocol Buffer Message names."
+
     Audio = 0
     Ping = 1
 
 
-class ClientType(IntEnum):
-    Regular = 0
-    Bot = 1
+class CLIENT_TYPE(IntEnum):
+    REGULAR = 0
+    BOT = 1
 
 
-# callbacks names
-PYMUMBLE_CLBK_CONNECTED = "connected"
-PYMUMBLE_CLBK_DISCONNECTED = "disconnected"
-PYMUMBLE_CLBK_CHANNELCREATED = "channel_created"
-PYMUMBLE_CLBK_CHANNELUPDATED = "channel_updated"
-PYMUMBLE_CLBK_CHANNELREMOVED = "channel_remove"
-PYMUMBLE_CLBK_USERCREATED = "user_created"
-PYMUMBLE_CLBK_USERUPDATED = "user_updated"
-PYMUMBLE_CLBK_USERREMOVED = "user_removed"
-PYMUMBLE_CLBK_SOUNDRECEIVED = "sound_received"
-PYMUMBLE_CLBK_TEXTMESSAGERECEIVED = "text_received"
-PYMUMBLE_CLBK_CONTEXTACTIONRECEIVED = "contextAction_received"
-PYMUMBLE_CLBK_ACLRECEIVED = "acl_received"
-PYMUMBLE_CLBK_PERMISSIONDENIED = "permission_denied"
+class AUDIO_CODEC(IntEnum):
+    CELT_ALPHA = 0
+    PING = 1
+    SPEEX = 2
+    CELT_BETA = 3
+    OPUS = 4
 
-# audio types
-PYMUMBLE_AUDIO_TYPE_CELT_ALPHA = 0
-PYMUMBLE_AUDIO_TYPE_PING = 1
-PYMUMBLE_AUDIO_TYPE_SPEEX = 2
-PYMUMBLE_AUDIO_TYPE_CELT_BETA = 3
-PYMUMBLE_AUDIO_TYPE_OPUS = 4
-PYMUMBLE_AUDIO_TYPE_OPUS_PROFILE = "audio"  # "voip"
 
-# command names
-PYMUMBLE_CMD_MOVE = "move"
-PYMUMBLE_CMD_MODUSERSTATE = "update_user"
-PYMUMBLE_CMD_TEXTMESSAGE = "text_message"
-PYMUMBLE_CMD_TEXTPRIVATEMESSAGE = "text_private_message"
-PYMUMBLE_CMD_LINKCHANNEL = "link"
-PYMUMBLE_CMD_UNLINKCHANNEL = "unlink"
-PYMUMBLE_CMD_QUERYACL = "get_acl"
-PYMUMBLE_CMD_UPDATEACL = "update_acl"
-PYMUMBLE_CMD_REMOVEUSER = "remove_user"
-PYMUMBLE_CMD_UPDATECHANNEL = "update_channel"
+class CALLBACK(Enum):
+    "Callback names, used as keys when registering/calling callbacks."
+
+    CONNECTED = auto()
+    DISCONNECTED = auto()
+    CHANNEL_CREATED = auto()
+    CHANNEL_UPDATED = auto()
+    CHANNEL_REMOVED = auto()
+    USER_CREATED = auto()
+    USER_UPDATED = auto()
+    USER_REMOVED = auto()
+    SOUND_RECEIVED = auto()
+    TEXT_MESSAGE_RECEIVED = auto()
+    CONTEXT_ACTION_RECEIVED = auto()
+    ACL_RECEIVED = auto()
+    PERMISSION_DENIED = auto()
+
+
+class CMD(Enum):
+    "pymumble command types, used as keys when dispatching commands. See :mod:`messages`."
+
+    MOVE = auto()
+    MOD_USER_STATE = auto()
+    TEXT_MESSAGE = auto()
+    TEXT_PRIVATE_MESSAGE = auto()
+    LINK_CHANNEL = auto()
+    UNLINK_CHANNEL = auto()
+    QUERY_ACL = auto()
+    UPDATE_ACL = auto()
+    REMOVE_USER = auto()
+    UPDATE_CHANNEL = auto()

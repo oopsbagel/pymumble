@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .errors import UnknownCallbackError
-from .constants import *
+from .constants import CALLBACK
 import threading
 
 
@@ -17,19 +17,19 @@ class CallBacks(dict):
     def __init__(self):
         self.update(
             {
-                PYMUMBLE_CLBK_CONNECTED: None,  # Connection succeeded
-                PYMUMBLE_CLBK_DISCONNECTED: None,  # Connection as been dropped
-                PYMUMBLE_CLBK_CHANNELCREATED: None,  # send the created channel object as parameter
-                PYMUMBLE_CLBK_CHANNELUPDATED: None,  # send the updated channel object and a dict with all the modified fields as parameter
-                PYMUMBLE_CLBK_CHANNELREMOVED: None,  # send the removed channel object as parameter
-                PYMUMBLE_CLBK_USERCREATED: None,  # send the added user object as parameter
-                PYMUMBLE_CLBK_USERUPDATED: None,  # send the updated user object and a dict with all the modified fields as parameter
-                PYMUMBLE_CLBK_USERREMOVED: None,  # send the removed user object and the mumble message as parameter
-                PYMUMBLE_CLBK_SOUNDRECEIVED: None,  # send the user object that received the sound and the SoundChunk object itself
-                PYMUMBLE_CLBK_TEXTMESSAGERECEIVED: None,  # Send the received message
-                PYMUMBLE_CLBK_CONTEXTACTIONRECEIVED: None,  # Send the contextaction message
-                PYMUMBLE_CLBK_ACLRECEIVED: None,  # Send the received ACL permissions object
-                PYMUMBLE_CLBK_PERMISSIONDENIED: None,  # Permission Denied for some action, send information
+                CALLBACK.CONNECTED: None,  # Connection succeeded
+                CALLBACK.DISCONNECTED: None,  # Connection as been dropped
+                CALLBACK.CHANNEL_CREATED: None,  # send the created channel object as parameter
+                CALLBACK.CHANNEL_UPDATED: None,  # send the updated channel object and a dict with all the modified fields as parameter
+                CALLBACK.CHANNEL_REMOVED: None,  # send the removed channel object as parameter
+                CALLBACK.USER_CREATED: None,  # send the added user object as parameter
+                CALLBACK.USER_UPDATED: None,  # send the updated user object and a dict with all the modified fields as parameter
+                CALLBACK.USER_REMOVED: None,  # send the removed user object and the mumble message as parameter
+                CALLBACK.SOUND_RECEIVED: None,  # send the user object that received the sound and the SoundChunk object itself
+                CALLBACK.TEXT_MESSAGE_RECEIVED: None,  # Send the received message
+                CALLBACK.CONTEXT_ACTION_RECEIVED: None,  # Send the contextaction message
+                CALLBACK.ACL_RECEIVED: None,  # Send the received ACL permissions object
+                CALLBACK.PERMISSION_DENIED: None,  # Permission Denied for some action, send information
             }
         )
 
@@ -84,7 +84,7 @@ class CallBacks(dict):
 
         if self[callback]:
             for func in self[callback]:
-                if callback is PYMUMBLE_CLBK_TEXTMESSAGERECEIVED:
+                if callback is CALLBACK.TEXT_MESSAGE_RECEIVED:
                     thr = threading.Thread(target=func, args=pos_parameters)
                     thr.start()
                 else:
