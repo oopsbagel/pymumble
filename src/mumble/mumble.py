@@ -10,7 +10,7 @@ import struct
 import google.protobuf.message as protobuf_message
 from typing import Optional
 
-from .errors import *
+from .errors import ConnectionRejectedError
 from .constants import *
 from .crypto import CryptStateOCB2
 from . import users
@@ -231,7 +231,7 @@ class MumbleUDP(threading.Thread):
             self.log.warn("error reading from udp encrypted socket: %s" % e)
             return
         if len(buffer) < 4:
-            self.log.debug("udp encrypted message is too short: %s" % e)
+            self.log.debug("udp encrypted message is too short: %i", len(buffer))
             return
         try:
             plaintext = self._crypt.decrypt(
@@ -364,7 +364,9 @@ class Mumble(threading.Thread):
     ):
         threading.Thread.__init__(self)
 
-        self.client_type = ClientType(client_type)  # raise ValueError on invalid ClientType
+        self.client_type = ClientType(
+            client_type
+        )  # raise ValueError on invalid ClientType
 
         self.Log = logging.getLogger(
             "PyMumble"

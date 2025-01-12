@@ -5,11 +5,6 @@
 from mumble import Mumble
 import subprocess as sp
 
-try:
-    import readline  # optional
-except ImportError:
-    pass
-
 server = "localhost"
 nick = "Alice"
 passwd = ""
