@@ -14,7 +14,7 @@ from .constants import (
 )
 
 
-class SoundQueue:
+class ReceivedAudioQueue:
     """
     Per user storage of received audio frames
     Takes care of the decoding of the received audio

@@ -79,7 +79,7 @@ In order to bring pymumble up to date with modern python development practices, 
 - The `Mumble` class getter/setter functions `set_application_string()`, `set_loop_rate()`, and `get_loop_rate()` have been removed. These parameters can be set in the `Mumble` object initializer and queried and changed by accessing the object's `application` and `loop_rate` public attributes.
 - Drop support for legacy audio codecs.
 - Rename all constants to drop the `PYMUMBLE_` prefix, some also renamed for clarity.
-- Rename `SoundOutput` to `SendAudio`.
+- Rename `SoundOutput` to `SendAudio` and `SoundQueue` to `ReceivedAudioQueue`.
 
 Because pymumble now follows the [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html) versioning scheme, any further breaking changes must increment the MAJOR version number. The dependency
 ```

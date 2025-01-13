@@ -327,7 +327,7 @@ class MumbleUDP(threading.Thread):
 
     @staticmethod
     def receive_audio(mumble: Mumble, audio: MumbleUDP_pb2.Audio):
-        """Add received audio to sending user's soundqueue and call SOUNDRECEIVED callback.
+        """Add received audio to sending user's receivedaudioqueue and call SOUNDRECEIVED callback.
 
         :param mumble: The ``mumble.Mumble`` object containing the users dict and callback table.
         :param audio: The decoded protobuf message containing opus encoded audio and metadata.
@@ -467,7 +467,7 @@ class Mumble(threading.Thread):
         )  # contains the server's channels information
         self.blobs = blobs.Blobs(self)  # manage the blob objects
         if self.enable_audio:
-            from sendaudio import SendAudio
+            from .sendaudio import SendAudio
 
             self.send_audio = SendAudio(
                 self,
