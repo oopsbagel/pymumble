@@ -2,7 +2,7 @@
 import struct
 
 from .constants import TCP_MSG_TYPE
-from .mumble_pb2 import RequestBlob
+from .Mumble_pb2 import RequestBlob
 
 
 class Blobs(dict):

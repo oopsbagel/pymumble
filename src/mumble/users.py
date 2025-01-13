@@ -3,7 +3,7 @@ from .constants import CALLBACK, TCP_MSG_TYPE
 from .errors import TextTooLongError, ImageTooBigError
 from threading import Lock
 from . import messages
-from . import mumble_pb2
+from . import Mumble_pb2
 
 
 class Users(dict):
@@ -223,7 +223,7 @@ class User(dict):
 
     def move_in(self, channel_id, token=None):
         if token:
-            authenticate = mumble_pb2.Authenticate()
+            authenticate = Mumble_pb2.Authenticate()
             authenticate.username = self.mumble_object.user
             authenticate.password = self.mumble_object.password
             authenticate.tokens.extend(self.mumble_object.tokens)

@@ -38,7 +38,7 @@ from . import blobs
 from . import commands
 from . import callbacks
 
-from . import mumble_pb2
+from . import Mumble_pb2
 from . import MumbleUDP_pb2
 
 
@@ -550,7 +550,7 @@ class Mumble(threading.Thread):
             self.control_socket.setblocking(False)
 
             # Perform the Mumble authentication
-            version = mumble_pb2.Version()
+            version = Mumble_pb2.Version()
             if PROTOCOL_VERSION[2] > 255:
                 version.version_v1 = (
                     (PROTOCOL_VERSION[0] << 16) + (PROTOCOL_VERSION[1] << 8) + 255
@@ -572,7 +572,7 @@ class Mumble(threading.Thread):
             self.Log.debug("sending: version: %s", version)
             self.send_message(TCP_MSG_TYPE.Version, version)
 
-            authenticate = mumble_pb2.Authenticate()
+            authenticate = Mumble_pb2.Authenticate()
             authenticate.username = self.user
             if self.password:
                 authenticate.password = self.password
@@ -638,7 +638,7 @@ class Mumble(threading.Thread):
 
     def ping(self):
         """Send the keepalive through available channels"""
-        ping = mumble_pb2.Ping()
+        ping = Mumble_pb2.Ping()
         ping.timestamp = int(time.time())
         ping.tcp_ping_avg = self.ping_stats["avg"]
         ping.tcp_ping_var = self.ping_stats["var"]
@@ -725,23 +725,23 @@ class Mumble(threading.Thread):
                 self.sound_received(message)
 
         elif type == TCP_MSG_TYPE.Version:
-            mess = mumble_pb2.Version()
+            mess = Mumble_pb2.Version()
             mess.ParseFromString(message)
             self.Log.debug("message: Version : %s", mess)
 
         elif type == TCP_MSG_TYPE.Authenticate:
-            mess = mumble_pb2.Authenticate()
+            mess = Mumble_pb2.Authenticate()
             mess.ParseFromString(message)
             self.Log.debug("message: Authenticate : %s", mess)
 
         elif type == TCP_MSG_TYPE.Ping:
-            mess = mumble_pb2.Ping()
+            mess = Mumble_pb2.Ping()
             mess.ParseFromString(message)
             self.Log.debug("message: Ping : %s", mess)
             self.ping_response(mess)
 
         elif type == TCP_MSG_TYPE.Reject:
-            mess = mumble_pb2.Reject()
+            mess = Mumble_pb2.Reject()
             mess.ParseFromString(message)
             self.Log.debug("message: reject : %s", mess)
             self.connected = CONN_STATE.FAILED
@@ -751,7 +751,7 @@ class Mumble(threading.Thread):
         elif (
             type == TCP_MSG_TYPE.ServerSync
         ):  # this message finish the connection process
-            mess = mumble_pb2.ServerSync()
+            mess = Mumble_pb2.ServerSync()
             mess.ParseFromString(message)
             self.Log.debug("message: serversync : %s", mess)
             self.users.set_myself(mess.session)
@@ -764,66 +764,66 @@ class Mumble(threading.Thread):
                 self.callbacks(CALLBACK.CONNECTED)
 
         elif type == TCP_MSG_TYPE.ChannelRemove:
-            mess = mumble_pb2.ChannelRemove()
+            mess = Mumble_pb2.ChannelRemove()
             mess.ParseFromString(message)
             self.Log.debug("message: ChannelRemove : %s", mess)
 
             self.channels.remove(mess.channel_id)
 
         elif type == TCP_MSG_TYPE.ChannelState:
-            mess = mumble_pb2.ChannelState()
+            mess = Mumble_pb2.ChannelState()
             mess.ParseFromString(message)
             self.Log.debug("message: channelstate : %s", mess)
 
             self.channels.update(mess)
 
         elif type == TCP_MSG_TYPE.UserRemove:
-            mess = mumble_pb2.UserRemove()
+            mess = Mumble_pb2.UserRemove()
             mess.ParseFromString(message)
             self.Log.debug("message: UserRemove : %s", mess)
 
             self.users.remove(mess)
 
         elif type == TCP_MSG_TYPE.UserState:
-            mess = mumble_pb2.UserState()
+            mess = Mumble_pb2.UserState()
             mess.ParseFromString(message)
             self.Log.debug("message: userstate : %s", mess)
 
             self.users.update(mess)
 
         elif type == TCP_MSG_TYPE.BanList:
-            mess = mumble_pb2.BanList()
+            mess = Mumble_pb2.BanList()
             mess.ParseFromString(message)
             self.Log.debug("message: BanList : %s", mess)
 
         elif type == TCP_MSG_TYPE.TextMessage:
-            mess = mumble_pb2.TextMessage()
+            mess = Mumble_pb2.TextMessage()
             mess.ParseFromString(message)
             self.Log.debug("message: TextMessage : %s", mess)
 
             self.callbacks(CALLBACK.TEXT_MESSAGE_RECEIVED, mess)
 
         elif type == TCP_MSG_TYPE.PermissionDenied:
-            mess = mumble_pb2.PermissionDenied()
+            mess = Mumble_pb2.PermissionDenied()
             mess.ParseFromString(message)
             self.Log.debug("message: PermissionDenied : %s", mess)
 
             self.callbacks(CALLBACK.PERMISSION_DENIED, mess)
 
         elif type == TCP_MSG_TYPE.ACL:
-            mess = mumble_pb2.ACL()
+            mess = Mumble_pb2.ACL()
             mess.ParseFromString(message)
             self.Log.debug("message: ACL : %s", mess)
             self.channels[mess.channel_id].update_acl(mess)
             self.callbacks(CALLBACK.ACL_RECEIVED, mess)
 
         elif type == TCP_MSG_TYPE.QueryUsers:
-            mess = mumble_pb2.QueryUsers()
+            mess = Mumble_pb2.QueryUsers()
             mess.ParseFromString(message)
             self.Log.debug("message: QueryUsers : %s", mess)
 
         elif type == TCP_MSG_TYPE.CryptSetup:
-            mess = mumble_pb2.CryptSetup()
+            mess = Mumble_pb2.CryptSetup()
             mess.ParseFromString(message)
             self.Log.debug("message: CryptSetup : %s", mess)
             if not self.force_tcp_only:
@@ -839,51 +839,51 @@ class Mumble(threading.Thread):
                 self.udp_thread.start()
 
         elif type == TCP_MSG_TYPE.ContextActionModify:
-            mess = mumble_pb2.ContextActionModify()
+            mess = Mumble_pb2.ContextActionModify()
             mess.ParseFromString(message)
             self.Log.debug("message: ContextActionModify : %s", mess)
 
             self.callbacks(CALLBACK.CONTEXT_ACTION_RECEIVED, mess)
 
         elif type == TCP_MSG_TYPE.ContextAction:
-            mess = mumble_pb2.ContextAction()
+            mess = Mumble_pb2.ContextAction()
             mess.ParseFromString(message)
             self.Log.debug("message: ContextAction : %s", mess)
 
         elif type == TCP_MSG_TYPE.UserList:
-            mess = mumble_pb2.UserList()
+            mess = Mumble_pb2.UserList()
             mess.ParseFromString(message)
             self.Log.debug("message: UserList : %s", mess)
 
         elif type == TCP_MSG_TYPE.VoiceTarget:
-            mess = mumble_pb2.VoiceTarget()
+            mess = Mumble_pb2.VoiceTarget()
             mess.ParseFromString(message)
             self.Log.debug("message: VoiceTarget : %s", mess)
 
         elif type == TCP_MSG_TYPE.PermissionQuery:
-            mess = mumble_pb2.PermissionQuery()
+            mess = Mumble_pb2.PermissionQuery()
             mess.ParseFromString(message)
             self.Log.debug("message: PermissionQuery : %s", mess)
 
         elif type == TCP_MSG_TYPE.CodecVersion:
-            mess = mumble_pb2.CodecVersion()
+            mess = Mumble_pb2.CodecVersion()
             mess.ParseFromString(message)
             self.Log.debug("message: CodecVersion : %s", mess)
             if self.send_audio:
                 self.send_audio.set_default_codec(mess)
 
         elif type == TCP_MSG_TYPE.UserStats:
-            mess = mumble_pb2.UserStats()
+            mess = Mumble_pb2.UserStats()
             mess.ParseFromString(message)
             self.Log.debug("message: UserStats : %s", mess)
 
         elif type == TCP_MSG_TYPE.RequestBlob:
-            mess = mumble_pb2.RequestBlob()
+            mess = Mumble_pb2.RequestBlob()
             mess.ParseFromString(message)
             self.Log.debug("message: RequestBlob : %s", mess)
 
         elif type == TCP_MSG_TYPE.ServerConfig:
-            mess = mumble_pb2.ServerConfig()
+            mess = Mumble_pb2.ServerConfig()
             mess.ParseFromString(message)
             self.Log.debug("message: ServerConfig : %s", mess)
             for line in str(mess).split("\n"):
@@ -964,7 +964,7 @@ class Mumble(threading.Thread):
     def treat_command(self, cmd):
         """Send the awaiting commands to the server.  Used in the pymumble thread."""
         if cmd.cmd == CMD.MOVE:
-            userstate = mumble_pb2.UserState()
+            userstate = Mumble_pb2.UserState()
             userstate.session = cmd.parameters["session"]
             userstate.channel_id = cmd.parameters["channel_id"]
             self.Log.debug("Moving to channel")
@@ -972,7 +972,7 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.TEXT_MESSAGE:
-            textmessage = mumble_pb2.TextMessage()
+            textmessage = Mumble_pb2.TextMessage()
             textmessage.session.append(cmd.parameters["session"])
             textmessage.channel_id.append(cmd.parameters["channel_id"])
             textmessage.message = cmd.parameters["message"]
@@ -980,14 +980,14 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.TEXT_PRIVATE_MESSAGE:
-            textprivatemessage = mumble_pb2.TextMessage()
+            textprivatemessage = Mumble_pb2.TextMessage()
             textprivatemessage.session.append(cmd.parameters["session"])
             textprivatemessage.message = cmd.parameters["message"]
             self.send_message(TCP_MSG_TYPE.TextMessage, textprivatemessage)
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == TCP_MSG_TYPE.ChannelState:
-            channelstate = mumble_pb2.ChannelState()
+            channelstate = Mumble_pb2.ChannelState()
             channelstate.parent = cmd.parameters["parent"]
             channelstate.name = cmd.parameters["name"]
             channelstate.temporary = cmd.parameters["temporary"]
@@ -995,27 +995,27 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == TCP_MSG_TYPE.ChannelRemove:
-            channelremove = mumble_pb2.ChannelRemove()
+            channelremove = Mumble_pb2.ChannelRemove()
             channelremove.channel_id = cmd.parameters["channel_id"]
             self.send_message(TCP_MSG_TYPE.ChannelRemove, channelremove)
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.UPDATE_CHANNEL:
-            channelstate = mumble_pb2.ChannelState()
+            channelstate = Mumble_pb2.ChannelState()
             for key, value in cmd.parameters.items():
                 setattr(channelstate, key, value)
             self.send_message(TCP_MSG_TYPE.ChannelState, channelstate)
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.LINK_CHANNEL:
-            channelstate = mumble_pb2.ChannelState()
+            channelstate = Mumble_pb2.ChannelState()
             channelstate.channel_id = cmd.parameters["channel_id"]
             channelstate.links_add.append(cmd.parameters["add_id"])
             self.send_message(TCP_MSG_TYPE.ChannelState, channelstate)
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.UNLINK_CHANNEL:
-            channelstate = mumble_pb2.ChannelState()
+            channelstate = Mumble_pb2.ChannelState()
             channelstate.channel_id = cmd.parameters["channel_id"]
             for remove_id in cmd.parameters["remove_ids"]:
                 channelstate.links_remove.append(remove_id)
@@ -1023,16 +1023,16 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == TCP_MSG_TYPE.VoiceTarget:
-            textvoicetarget = mumble_pb2.VoiceTarget()
+            textvoicetarget = Mumble_pb2.VoiceTarget()
             textvoicetarget.id = cmd.parameters["id"]
             targets = []
             if cmd.parameters["id"] == 1:
-                voicetarget = mumble_pb2.VoiceTarget.Target()
+                voicetarget = Mumble_pb2.VoiceTarget.Target()
                 voicetarget.channel_id = cmd.parameters["targets"][0]
                 targets.append(voicetarget)
             else:
                 for target in cmd.parameters["targets"]:
-                    voicetarget = mumble_pb2.VoiceTarget.Target()
+                    voicetarget = Mumble_pb2.VoiceTarget.Target()
                     voicetarget.session.append(target)
                     targets.append(voicetarget)
             textvoicetarget.targets.extend(targets)
@@ -1040,7 +1040,7 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.MOD_USER_STATE:
-            userstate = mumble_pb2.UserState()
+            userstate = Mumble_pb2.UserState()
             userstate.session = cmd.parameters["session"]
 
             if "mute" in cmd.parameters:
@@ -1076,7 +1076,7 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.REMOVE_USER:
-            userremove = mumble_pb2.UserRemove()
+            userremove = Mumble_pb2.UserRemove()
             userremove.session = cmd.parameters["session"]
             userremove.reason = cmd.parameters["reason"]
             userremove.ban = cmd.parameters["ban"]
@@ -1084,19 +1084,19 @@ class Mumble(threading.Thread):
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.QUERY_ACL:
-            acl = mumble_pb2.ACL()
+            acl = Mumble_pb2.ACL()
             acl.channel_id = cmd.parameters["channel_id"]
             acl.query = True
             self.send_message(TCP_MSG_TYPE.ACL, acl)
             cmd.response = True
             self.commands.answer(cmd)
         elif cmd.cmd == CMD.UPDATE_ACL:
-            acl = mumble_pb2.ACL()
+            acl = Mumble_pb2.ACL()
             acl.channel_id = cmd.parameters["channel_id"]
             acl.inherit_acls = cmd.parameters["inherit_acls"]
 
             for msg_group in cmd.parameters["chan_group"]:
-                chan_group = mumble_pb2.ACL.ChanGroup()
+                chan_group = Mumble_pb2.ACL.ChanGroup()
                 chan_group.name = msg_group["name"]
                 if msg_group["inherited"] is not None:
                     chan_group.inherited = msg_group["inherited"]
@@ -1111,7 +1111,7 @@ class Mumble(threading.Thread):
                 acl.groups.append(chan_group)
 
             for msg_acl in cmd.parameters["chan_acl"]:
-                chan_acl = mumble_pb2.ACL.ChanACL()
+                chan_acl = Mumble_pb2.ACL.ChanACL()
                 if msg_acl["apply_here"] is not None:
                     chan_acl.apply_here = msg_acl["apply_here"]
                 if msg_acl["apply_subs"] is not None:
@@ -1145,7 +1145,7 @@ class Mumble(threading.Thread):
         return self.channels[self.users.myself["channel_id"]]
 
     def denial_type(self, n):
-        return mumble_pb2.PermissionDenied.DenyType.Name(n)
+        return Mumble_pb2.PermissionDenied.DenyType.Name(n)
 
     def stop(self):
         self.reconnect = None
