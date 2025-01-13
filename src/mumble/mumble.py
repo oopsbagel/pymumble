@@ -162,7 +162,7 @@ class MumbleUDPServerInfo(threading.Thread):
                     self._ping_server(server)
                     server.last_ping_sent = time.time()
 
-            (rlist, wlist, xlist) = select.select(sockets, [], sockets, self.loop_rate)
+            (rlist, wlist, xlist) = select.select(sockets, [], sockets, self._loop_rate)
             for sock in rlist:
                 self._read_udp_message(sock)
             for sock in xlist:
