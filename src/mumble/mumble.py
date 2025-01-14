@@ -110,6 +110,7 @@ class MumbleUDPServerInfo(threading.Thread):
         threading.Thread.__init__(self, name="MumbleUDPServerInfoThread", daemon=True)
         self._active = False  # semaphore for whether to allow run() to terminate
         self._loop_rate = loop_rate
+        self.ready_event = threading.Event()
         self.servers = {}
 
         self.Log = logging.getLogger("PyMumbleUDPServerInfo")
@@ -154,6 +155,7 @@ class MumbleUDPServerInfo(threading.Thread):
         server.max_bandwidth_per_user = ping.max_bandwidth_per_user
 
     def run(self):
+        self.ready_event.set()
         while self._active:
             sockets = []
             for server in self.servers.values():
