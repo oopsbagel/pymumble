@@ -93,23 +93,32 @@ class ServerInfo:
         server_family = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][0]
         self.socket = socket.socket(server_family, socket.SOCK_DGRAM)
         self.socket.connect((host, port))
+        self.latency = None
         self.last_ping_sent = 0
+        self.last_ping_recv = None
+        self.user_count = None
+        self.version = None
+        self.max_user_count = None
+        self.max_bandwidth_per_user = None
 
 
-class MumbleUDPServerInfo(threading.Thread):
+class MumbleServerInfo(threading.Thread):
     """Manage unencrypted pings to retrieve server latency and extendend information.
 
-    Register servers with add_server(host, port).
-    Sends an unencrypted UDP ping every PING_INTERVAL seconds.
+    Sends an unencrypted UDP ping every ping_interval seconds.
     Records server information in servers dict indexed by (host, port) tuples.
     Remove servers with delete_server(host, port).
 
-    Automatically runs the thread when a server is registered."""
+    :param ping_interval: Time between pings in seconds.
+    :param loop_rate: Client tick rate in seconds.
+    :param debug: Send debugging messages to `stdout`.
+    """
 
-    def __init__(self, debug=False, loop_rate=0.01):
+    def __init__(self, ping_interval=PING_INTERVAL, loop_rate=0.01, debug=False):
         threading.Thread.__init__(self, name="MumbleUDPServerInfoThread", daemon=True)
-        self._active = False  # semaphore for whether to allow run() to terminate
+        self._active = True  # semaphore for whether to allow run() to terminate
         self._loop_rate = loop_rate
+        self._ping_interval = ping_interval
         self.ready_event = threading.Event()
         self.servers = {}
 
@@ -122,23 +131,57 @@ class MumbleUDPServerInfo(threading.Thread):
         sh.setFormatter(formatter)
         self.Log.addHandler(sh)
 
-    def add_server(self, host: str, port: int = 64738):
-        if not self._active:
-            self._active = True
-            self.start()
-        server = ServerInfo(host, port)
-        self.servers[server.socket.getpeername()] = server
+    def __enter__(self) -> MumbleServerInfo:
+        self.start()
+        if not self.ready_event.wait(1):
+            raise RuntimeError("Timed out waiting for MumbleServerInfo to start.")
+        return self
 
-    def delete_server(self, host: str, port: int = 64738):
+    def __exit__(self, exc_type, exc_val, exc_tb) -> False:
+        self.stop()
+        self.join()
+        return False  # completed successfully, do not suppress the raised exception
+
+    def add_server(self, host: str, port: int = 64738) -> tuple[str, int]:
+        """Register a server to continuously ping every `self._ping_interval` seconds.
+
+        The return value's `host` field may differ than the provided parameter based on
+        the return value of ``socket.getpeername()``.
+
+        :param host: The Mumble server domain name or IP address.
+        :param port: The Mumble server port.
+        :return: A tuple in the form ``(host, port)`` used as the `.servers` key.
+        """
+        server = ServerInfo(host, port)
+        peername = server.socket.getpeername()
+        self.servers[peername] = server
+        return peername
+
+    def delete_server(self, host: str, port: int = 64738) -> ServerInfo | None:
+        """Stop pinging a server. Removes the :class:`ServerInfo` object from `.servers`.
+
+        Does nothing if the server is not found.
+
+        :param host: The Mumble server domain name or IP address.
+        :param port: The Mumble server port.
+        :return: The server's :class:`ServerInfo` object.
+        """
         addrinfo = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][4]
+        server_info = self.servers.get(addrinfo)
         if addrinfo in self.servers:
             del self.servers[addrinfo]
+        return server_info
 
-    def stop(self):
+    def stop(self) -> None:
         "Stop the thread without deleting the recorded data."
         self._active = False
 
-    def _ping_server(self, server: ServerInfo):
+    def _ping_server(self, server: ServerInfo) -> None:
+        """Send an unencrypted :class:`MumbleUDP_pb2.Ping` message to `server` requesting
+        extended information.
+
+        :param server: The :class:`ServerInfo` object containing an active :type:`socket.socket`.
+        """
         ping = MumbleUDP_pb2.Ping(
             timestamp=int(time.time()), request_extended_information=True
         )
@@ -146,7 +189,12 @@ class MumbleUDPServerInfo(threading.Thread):
         self.Log.debug("pinging %s %s" % (server.host, server.port))
         server.socket.sendto(msg, (server.host, server.port))
 
-    def _receive_ping(self, ping: UDP_MSG_TYPE.Ping, server: ServerInfo):
+    def _receive_ping(self, ping: MumbleUDP_pb2.Ping, server: ServerInfo) -> None:
+        """Record server information contained in `ping` in `server`.
+
+        :param ping: The received :class:`MumbleUDP_pb2.Ping` from the server.
+        :param server: The :class:`ServerInfo` object to record data into.
+        """
         server.last_ping_recv = int(time.time() * 1000)
         server.latency = server.last_ping_recv - int(server.last_ping_sent * 1000)
         server.version = ping.server_version_v2
@@ -155,12 +203,15 @@ class MumbleUDPServerInfo(threading.Thread):
         server.max_bandwidth_per_user = ping.max_bandwidth_per_user
 
     def run(self):
+        """Send periodic pings to servers and read responses until `self._active` is False.
+        Set `self.ready_event` when starting.
+        """
         self.ready_event.set()
         while self._active:
             sockets = []
             for server in self.servers.values():
                 sockets.append(server.socket)
-                if server.last_ping_sent + PING_INTERVAL <= time.time():
+                if server.last_ping_sent + self._ping_interval <= time.time():
                     self._ping_server(server)
                     server.last_ping_sent = time.time()
 
@@ -172,7 +223,13 @@ class MumbleUDPServerInfo(threading.Thread):
                     if server.socket is sock:
                         self.delete_server(server.host, server.port)
 
-    def _read_udp_message(self, sock: socket.socket):
+    def _read_udp_message(self, sock: socket.socket) -> None:
+        """Read a message from `sock` and attempt to decode as a `MumbleUDP_pb2`
+        protocol buffer message. Ignores Audio type messages, and dispatches
+        Ping type messages to :func:`_receive_ping:`.
+
+        :param sock: The socket to read from.
+        """
         try:
             buffer = sock.recv(MAX_UDP_PACKET_SIZE)
         except socket.error as e:
