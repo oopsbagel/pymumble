@@ -28,3 +28,21 @@ def test_ping_send_and_response():
     assert type(server.udp_received_msgs[0]) is MumbleUDP_pb2.Ping
     assert type(server.udp_received_msgs[0].timestamp) is int
     assert server.udp_received_msgs[0].request_extended_information
+
+
+def test_ignores_audio_response():
+    server_response = MumbleUDP_pb2.Audio(target=1)
+    with Server([server_response], 0.01) as server:
+        with MumbleServerInfo() as m:
+            print(server.host, server.udp_port)
+            srv = m.add_server(server.host, server.udp_port)
+            time.sleep(1)  # XXX find a faster way to wait for ping & response
+
+    assert len(m.servers) == 1
+    assert m.servers[srv].version is None
+    assert m.servers[srv].user_count is None
+    assert m.servers[srv].max_user_count is None
+    assert m.servers[srv].max_bandwidth_per_user is None
+    assert m.servers[srv].latency is None
+    assert len(server.udp_received_msgs) == 1
+    assert type(server.udp_received_msgs[0]) is MumbleUDP_pb2.Ping
