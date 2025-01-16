@@ -497,6 +497,16 @@ class Mumble(threading.Thread):
 
         self.positional = None
 
+    def __enter__(self) -> Mumble:
+        self.start()
+        self.is_ready()  # block until the client is connected
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> False:
+        self.stop()
+        self.join()
+        return False  # completed successfully, do not suppress the raised exception
+
     def init_connection(self):
         """Initialize variables that are local to a connection, (needed if the client automatically reconnect)"""
         self.ready_lock.acquire(
