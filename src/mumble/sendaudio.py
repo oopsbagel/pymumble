@@ -45,6 +45,7 @@ class SendAudio:
 
         self.pcm = []
         self.lock = threading.Lock()
+        self.queue_empty = threading.Event()
 
         self.codec = None  # codec currently requested by the server
         self.encoder = None  # codec instance currently used to encode
@@ -67,6 +68,7 @@ class SendAudio:
         if (
             not self.encoder or len(self.pcm) == 0
         ):  # no codec configured or no audio sent
+            self.queue_empty.set()
             return ()
 
         samples = int(
@@ -200,6 +202,8 @@ class SendAudio:
         """add sound to be sent (in PCM 16 bits signed format)"""
         if len(pcm) % 2 != 0:  # check that the data is align on 16 bits
             raise Exception("pcm data must be 16 bits")
+
+        self.queue_empty.clear()
 
         samples = int(
             self.encoder_framesize * SAMPLE_RATE * 2 * self.channels

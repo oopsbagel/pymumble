@@ -55,6 +55,7 @@ sound = subprocess.Popen(
     stdin=wav,
 ).stdout.read()
 m.send_audio.add_sound(sound)
+m.send_audio.queue_empty.wait()
 m.join()
 ```
 
