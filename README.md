@@ -30,33 +30,30 @@ uv sync
 # ///
 from mumble import Mumble
 
-m = Mumble("127.0.0.1", "A Weedy Samaritan")
-m.start()
-m.is_ready()
-usernames = [
-    user["name"]
-    for user in m.my_channel().get_users()
-    if user["session"] != m.users.myself_session
-]
-m.my_channel().send_text_message(
-    "Hello, " + ", ".join(usernames) + ". You're all Brian! You're all individuals!"
-)
+with Mumble("127.0.0.1", "A Weedy Samaritan") as m:
+  usernames = [
+      user["name"]
+      for user in m.my_channel().get_users()
+      if user["session"] != m.users.myself_session
+  ]
+  m.my_channel().send_text_message(
+      "Hello, " + ", ".join(usernames) + ". You're all Brian! You're all individuals!"
+  )
 
-# If you have `espeak` installed:
-import subprocess
+  # If you have `espeak` installed:
+  import subprocess
 
-wav = subprocess.Popen(
-    ["espeak", "--stdout", "'People called Romanes, they go the house?'"],
-    stdout=subprocess.PIPE,
-).stdout
-sound = subprocess.Popen(
-    ["ffmpeg", "-i", "-", "-ac", "1", "-f", "s32le", "-"],
-    stdout=subprocess.PIPE,
-    stdin=wav,
-).stdout.read()
-m.send_audio.add_sound(sound)
-m.send_audio.queue_empty.wait()
-m.join()
+  wav = subprocess.Popen(
+      ["espeak", "--stdout", "'People called Romanes, they go the house?'"],
+      stdout=subprocess.PIPE,
+  ).stdout
+  sound = subprocess.Popen(
+      ["ffmpeg", "-i", "-", "-ac", "1", "-f", "s32le", "-"],
+      stdout=subprocess.PIPE,
+      stdin=wav,
+  ).stdout.read()
+  m.send_audio.add_sound(sound)
+  m.send_audio.queue_empty.wait()
 ```
 
 Refer to the [user manual](API.md) for detailed documentation.
@@ -69,6 +66,7 @@ The following enhancements are included in pymumble 2.0.0:
 - Support the latest protocol version: 1.5.735.
 - Use `uv` for packaging and `ruff` for linting.
 - Send functional version string compatible with the latest Mumble server.
+- Support Python `with` statements.
 
 In order to bring pymumble up to date with modern python development practices, the following breaking changes have been introduced in version 2.0.0:
 
