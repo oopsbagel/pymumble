@@ -10,7 +10,10 @@ import struct
 import google.protobuf.message as protobuf_message
 from typing import Optional
 
-from .errors import ConnectionRejectedError
+from .blobs import Blobs
+from .callbacks import CallBacks
+from .channels import Channels
+from .commands import Commands
 from .constants import (
     CONN_STATE,
     CALLBACK,
@@ -32,11 +35,8 @@ from .constants import (
     OPUS_PROFILE,
 )
 from .crypto import CryptStateOCB2, DecryptFailedException
-from . import users
-from . import channels
-from . import blobs
-from . import commands
-from . import callbacks
+from .errors import ConnectionRejectedError
+from .users import Users
 
 from . import Mumble_pb2
 from . import MumbleUDP_pb2
@@ -45,6 +45,7 @@ from . import MumbleUDP_pb2
 def _wrap_socket(
     sock, keyfile=None, certfile=None, verify_mode=ssl.CERT_NONE, server_hostname=None
 ):
+    """Wrap `sock` with TLS."""
     try:
         ssl_context = ssl.create_default_context()
         if certfile:
@@ -87,7 +88,7 @@ class ServerInfo:
     last_ping_sent: float
     last_ping_recv: float
 
-    def __init__(self, host, port):
+    def __init__(self, host: str, port: int):
         self.host = host
         self.port = port
         server_family = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][0]
@@ -115,7 +116,7 @@ class MumbleServerInfo(threading.Thread):
     """
 
     def __init__(self, ping_interval=PING_INTERVAL, loop_rate=0.01, debug=False):
-        threading.Thread.__init__(self, name="MumbleUDPServerInfoThread", daemon=True)
+        threading.Thread.__init__(self, name="MumbleServerInfoThread", daemon=True)
         self._active = True  # semaphore for whether to allow run() to terminate
         self._loop_rate = loop_rate
         self._ping_interval = ping_interval
@@ -488,7 +489,7 @@ class Mumble(threading.Thread):
         else:
             self.Log.debug("Working in MONO mode.")
 
-        self.callbacks = callbacks.CallBacks()  # callbacks management
+        self.callbacks = CallBacks()  # callbacks management
 
         self.ready_lock = (
             threading.Lock()
@@ -528,13 +529,13 @@ class Mumble(threading.Thread):
         self.server_max_message_length = 5000
         self.server_max_image_message_length = 131072
 
-        self.users = users.Users(
+        self.users = Users(
             self, self.callbacks
         )  # contains the server's connected users information
-        self.channels = channels.Channels(
+        self.channels = Channels(
             self, self.callbacks
         )  # contains the server's channels information
-        self.blobs = blobs.Blobs(self)  # manage the blob objects
+        self.blobs = Blobs(self)  # manage the blob objects
         if self.enable_audio:
             from .sendaudio import SendAudio
 
@@ -548,7 +549,7 @@ class Mumble(threading.Thread):
         else:
             self.send_audio = None
         self.commands = (
-            commands.Commands()
+            Commands()
         )  # manage commands sent between the main and the mumble threads
 
         self.receive_buffer = bytes()  # initialize the control connection input buffer
