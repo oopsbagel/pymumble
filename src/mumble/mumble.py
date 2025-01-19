@@ -43,36 +43,21 @@ from . import MumbleUDP_pb2
 
 
 def _wrap_socket(
-    sock, keyfile=None, certfile=None, verify_mode=ssl.CERT_NONE, server_hostname=None
+    sock: socket.socket,
+    keyfile: str | None = None,
+    certfile: str | None = None,
+    verify_mode: ssl.VerifyMode = ssl.CERT_NONE,
+    server_hostname: str | None = None,
 ):
     """Wrap `sock` with TLS."""
-    try:
-        ssl_context = ssl.create_default_context()
-        if certfile:
-            ssl_context.load_cert_chain(certfile, keyfile)
-        ssl_context.check_hostname = (verify_mode != ssl.CERT_NONE) and (
-            server_hostname is not None
-        )
-        ssl_context.verify_mode = verify_mode
-        return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
-    except AttributeError:
-        try:
-            return ssl.wrap_socket(
-                sock,
-                keyfile,
-                certfile,
-                cert_reqs=verify_mode,
-                ssl_version=ssl.PROTOCOL_TLS,
-            )
-        except AttributeError:
-            return ssl.wrap_socket(
-                sock,
-                keyfile,
-                certfile,
-                cert_reqs=verify_mode,
-                ssl_version=ssl.PROTOCOL_TLSv1,
-            )
-
+    ssl_context = ssl.create_default_context()
+    if certfile:
+        ssl_context.load_cert_chain(certfile, keyfile)
+    ssl_context.check_hostname = (verify_mode != ssl.CERT_NONE) and (
+        server_hostname is not None
+    )
+    ssl_context.verify_mode = verify_mode
+    return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
 
 class ServerInfo:
     "Store latency and extended server information for unauthenticated servers"
@@ -652,7 +637,8 @@ class Mumble(threading.Thread):
             authenticate.client_type = self.client_type
             self.Log.debug("sending: authenticate: %s", authenticate)
             self.send_message(TCP_MSG_TYPE.Authenticate, authenticate)
-        except socket.error:
+        except socket.error as e:
+            self.Log.debug("unable to connect to server: %s", e)
             self.connected = CONN_STATE.FAILED
             return self.connected
 
