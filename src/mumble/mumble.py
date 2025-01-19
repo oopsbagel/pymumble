@@ -113,7 +113,7 @@ class MumbleServerInfo(threading.Thread):
         self._loop_rate = loop_rate
         self._ping_interval = ping_interval
         self.ready_event = threading.Event()
-        self.servers = {}
+        self.servers: dict[tuple[str, int] | tuple[str, int, int, int], ServerInfo] = {}
 
         self.Log = logging.getLogger("PyMumbleUDPServerInfo")
         if debug:
@@ -364,7 +364,7 @@ class MumbleUDP(threading.Thread):
             msgtype = UDP_MSG_TYPE(header)
         except ValueError:
             log.warn("received UDP message of unknown type, ignoring")
-            return
+            return None
 
         MsgClass = getattr(MumbleUDP_pb2, msgtype.name)
         decoded_msg = MsgClass()
@@ -372,7 +372,7 @@ class MumbleUDP(threading.Thread):
             decoded_msg.ParseFromString(message)
         except protobuf_message.DecodeError as e:
             log.warn("unable to decode message as UDP %s: %s" % (msgtype.name, e))
-            return
+            return None
         log.debug(f"message: UDP {msgtype.name} : {decoded_msg}")
         return decoded_msg
 
@@ -467,7 +467,6 @@ class Mumble(threading.Thread):
         self.tokens = tokens
         self.__opus_profile = OPUS_PROFILE
         self.stereo = stereo
-        self.client_type = client_type
         self.enable_audio = enable_audio
         self.loop_rate = loop_rate
         self.application = application
@@ -494,7 +493,7 @@ class Mumble(threading.Thread):
         self.is_ready()  # block until the client is connected
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> False:
+    def __exit__(self, exc_type, exc_val, exc_tb) -> t.Literal[False]:
         self.stop()
         self.join()
         return False  # completed successfully, do not suppress the raised exception
