@@ -152,7 +152,7 @@ class SendAudio:
                         raise socket.error("Server socket error")
                     tcppacket = tcppacket[sent:]
             else:
-                self.mumble_object.udp_thread.encrypt_and_send(msg)
+                self.mumble_object.udp_thread.encrypt_and_send_message(msg)
 
     def get_audio_per_packet(self):
         """return the configured length of a audio packet (in ms)"""

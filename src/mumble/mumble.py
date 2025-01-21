@@ -293,7 +293,7 @@ class MumbleUDP(threading.Thread):
         ping = MumbleUDP_pb2.Ping(timestamp=int(time.time()))
         msg = struct.pack("!B", UDP_MSG_TYPE.Ping) + ping.SerializeToString()
         self.log.debug("sending encrypted ping: %s", msg.hex)
-        self.encrypt_and_send(msg)
+        self.encrypt_and_send_message(msg)
 
     def _read_message(self):
         try:
@@ -339,7 +339,7 @@ class MumbleUDP(threading.Thread):
             elif self._socket in xlist:
                 self.log.warn("socket in xlist")
 
-    def encrypt_and_send(self, plaintext: bytes) -> int:
+    def encrypt_and_send_message(self, plaintext: bytes) -> int:
         """Encrypt message with the server's AES key in OCB2 mode and send the ciphertext via the UDP socket.
 
         :param plaintext: Bytes containing the protobuf encoded message.
