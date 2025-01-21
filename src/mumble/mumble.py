@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import annotations
 import threading
 import logging
@@ -62,18 +61,24 @@ def _wrap_socket(
 
 
 class ServerInfo:
-    "Store latency and extended server information for unauthenticated servers"
+    """Store latency and extended server information for unauthenticated servers."""
 
-    host: str
-    port: int
-    socket: socket.socket
-    latency: int | None
-    version: str | None
-    max_user_count: int | None
-    max_bandwidth_per_user: int | None
-    user_count: int | None
-    last_ping_sent: float
-    last_ping_recv: float | None
+    host: str  #: The DNS name or IP address of the remote server.
+    port: int  #: The UDP port number of the remote server.
+    socket: socket.socket  #: The UDP socket.
+    latency: int | None = None  #: Round-trip latency in milliseconds.
+    version: str | None = None  #: The server version.
+    max_user_count: int | None = None  #: The maximum number of allowed users.
+    max_bandwidth_per_user: int | None = (
+        None  #: The maximum bandwidth in bytes per second per user.
+    )
+    user_count: int | None = None  #: The number of currently connected users.
+    last_ping_sent: float = (
+        0  #: Unix epoch time when the last ping was sent to the server.
+    )
+    last_ping_recv: float | None = (
+        None  #: Unix epoch time when the last ping was received by the server.
+    )
 
     def __init__(self, host: str, port: int):
         self.host = host
@@ -82,20 +87,14 @@ class ServerInfo:
         self.socket = socket.socket(server_family, socket.SOCK_DGRAM)
         self.socket.connect((host, port))
         self.latency = None
-        self.last_ping_sent = 0
-        self.last_ping_recv = None
-        self.user_count = None
-        self.version = None
-        self.max_user_count = None
-        self.max_bandwidth_per_user = None
 
 
 class MumbleServerInfo(threading.Thread):
-    """Manage unencrypted pings to retrieve server latency and extendend information.
+    """Manage unencrypted pings to retrieve server latency and extended information.
 
-    Sends an unencrypted UDP ping every ping_interval seconds.
-    Records server information in servers dict indexed by (host, port) tuples.
-    Remove servers with delete_server(host, port).
+    Sends an unencrypted UDP ping every ``ping_interval`` seconds.
+    Records server information in servers dict indexed by ``(host, port)`` tuples.
+    Remove servers with `delete_server(host, port)`.
 
     :param ping_interval: Time between pings in seconds.
     :param loop_rate: Client tick rate in seconds.
@@ -112,7 +111,9 @@ class MumbleServerInfo(threading.Thread):
         self._active = True  # semaphore for whether to allow run() to terminate
         self._loop_rate = loop_rate
         self._ping_interval = ping_interval
-        self.ready_event = threading.Event()
+        self.ready_event: threading.Event = (
+            threading.Event()
+        )  #: Set when the thread starts.
         self.servers: dict[tuple[str, int] | tuple[str, int, int, int], ServerInfo] = {}
 
         self.Log = logging.getLogger("PyMumbleUDPServerInfo")
@@ -197,7 +198,7 @@ class MumbleServerInfo(threading.Thread):
 
     def run(self):
         """Send periodic pings to servers and read responses until `self._active` is False.
-        Set `self.ready_event` when starting.
+        Sets `self.ready_event` when starting.
         """
         self.ready_event.set()
         while self._active:
@@ -497,7 +498,7 @@ class Mumble(threading.Thread):
         return False  # completed successfully, do not suppress the raised exception
 
     def init_connection(self):
-        """Initialize variables that are local to a connection, (needed if the client automatically reconnect)"""
+        """Set/reset connection specific variables before connecting or reconnecting."""
         self.ready_lock.acquire(
             False
         )  # reacquire the ready-lock in case of reconnection
@@ -550,9 +551,9 @@ class Mumble(threading.Thread):
         }
 
     def run(self):
-        """Connect to the server and start :func:`loop` in its thread. Attempt to
-        reconnect on disconnect every ``CONNECTION_RETRY_INTERVAL`` seconds if
-        :attr:`reconnect` is ``True``.
+        """Connect to the server and start :func:`loop` in this thread. On
+        disconnect, attempt to reconnect every ``CONNECTION_RETRY_INTERVAL``
+        seconds if :attr:`reconnect` is ``True``.
         """
         self.mumble_thread = threading.current_thread()
 
@@ -717,8 +718,8 @@ class Mumble(threading.Thread):
             self.Log.debug("Ping too long ! Disconnected ?")
             self.connected = CONN_STATE.NOT_CONNECTED
 
-    def receive_ping(self, mess: Mumble_pb2.Ping):
-        """Record ping statistics."""
+    def receive_ping(self):
+        """Update ping statistics."""
         self.ping_stats["last_rcv"] = int(time.time() * 1000)
         ping = int(time.time() * 1000) - self.ping_stats["time_send"]
         old_avg = self.ping_stats["avg"]
@@ -738,7 +739,11 @@ class Mumble(threading.Thread):
         self.ping_stats["nb"] += 1
 
     def send_message(self, type, message):
-        """Send a control message to the server"""
+        """Send a protobuf-encoded control message to the server.
+
+        :param type: Integer denoting the message type.
+        :param message: The protobuf-encoded message.
+        """
         packet = (
             struct.pack("!HL", type, message.ByteSize()) + message.SerializeToString()
         )
@@ -780,7 +785,7 @@ class Mumble(threading.Thread):
             self.dispatch_control_message(type, message)
 
     def dispatch_control_message(self, type: int, message: bytes):
-        """Dispatch control messages based on their protobuf message type.
+        """Run a control message handler for the received message.
 
         :param type: Integer denoting the message type.
         :param message: The protobuf-encoded message.
@@ -805,7 +810,7 @@ class Mumble(threading.Thread):
             mess = Mumble_pb2.Ping()
             mess.ParseFromString(message)
             self.Log.debug("message: Ping : %s", mess)
-            self.receive_ping(mess)
+            self.receive_ping()
 
         elif type == TCP_MSG_TYPE.Reject:
             mess = Mumble_pb2.Reject()
@@ -817,7 +822,7 @@ class Mumble(threading.Thread):
 
         elif (
             type == TCP_MSG_TYPE.ServerSync
-        ):  # this message finish the connection process
+        ):  # this message finishes the connection process
             mess = Mumble_pb2.ServerSync()
             mess.ParseFromString(message)
             self.Log.debug("message: serversync : %s", mess)
@@ -1015,7 +1020,7 @@ class Mumble(threading.Thread):
         return self.__opus_profile
 
     def is_ready(self):
-        """Wait for the connection to be fully completed."""
+        """Block until fully connected to the server."""
         self.ready_lock.acquire()
         self.ready_lock.release()
 
