@@ -438,9 +438,7 @@ class Mumble(threading.Thread):
             client_type
         )  # raise ValueError on invalid client type
 
-        self.Log = logging.getLogger(
-            "PyMumble"
-        )  # logging object for errors and debugging
+        self.Log = logging.getLogger("PyMumble")
         if debug:
             self.Log.setLevel(logging.DEBUG)
         else:
@@ -549,10 +547,13 @@ class Mumble(threading.Thread):
             "nb": 0,
             "avg": 40.0,
             "var": 0.0,
-        }  # Set / reset ping stats
+        }
 
     def run(self):
-        """Connect to the server and start the loop in its thread.  Retry if requested"""
+        """Connect to the server and start :func:`loop` in its thread. Attempt to
+        reconnect on disconnect every ``CONNECTION_RETRY_INTERVAL`` seconds if
+        :attr:`reconnect` is ``True``.
+        """
         self.mumble_thread = threading.current_thread()
 
         # loop if auto-reconnect is requested
@@ -582,7 +583,9 @@ class Mumble(threading.Thread):
             time.sleep(CONNECTION_RETRY_INTERVAL)
 
     def connect(self):
-        """Connect to the server"""
+        """Open a TLS connection to :attr:`host` and send the Mumble ``Version``
+        and ``Authenticate`` messages.
+        """
         try:
             # Get IPv4/IPv6 server address
             server_info = socket.getaddrinfo(
@@ -652,12 +655,13 @@ class Mumble(threading.Thread):
 
     def loop(self):
         """
-        Main loop
-        waiting for a message from the server for maximum self.loop_rate time
-        take care of sending the ping
-        take care of sending the queued commands to the server
-        check on every iteration for outgoing sound
-        check for disconnection
+        Main loop. Handles:
+
+        - reading messages from the server for maximum :attr:`loop_rate`
+        - sending pings every ``PING_INTERVAL`` seconds
+        - sending queued commands from :attr:`commands`
+        - sending audio packets
+        - checking for disconnection
         """
         self.Log.debug("entering loop")
         self.exit = False
@@ -689,16 +693,14 @@ class Mumble(threading.Thread):
                 [self.control_socket], [], [self.control_socket], self.loop_rate
             )  # wait for a socket activity
 
-            if (
-                self.control_socket in rlist
-            ):  # something to be read on the control socket
+            if self.control_socket in rlist:
                 self.read_control_messages()
             elif self.control_socket in xlist:  # socket was closed
                 self.control_socket.close()
                 self.connected = CONN_STATE.NOT_CONNECTED
 
     def ping(self):
-        """Send the keepalive through available channels"""
+        """Send a :class:`Mumble_pb2.Ping` message to the server."""
         ping = Mumble_pb2.Ping()
         ping.timestamp = int(time.time())
         ping.tcp_ping_avg = self.ping_stats["avg"]
@@ -715,7 +717,8 @@ class Mumble(threading.Thread):
             self.Log.debug("Ping too long ! Disconnected ?")
             self.connected = CONN_STATE.NOT_CONNECTED
 
-    def ping_response(self, mess: Mumble_pb2.Ping):
+    def receive_ping(self, mess: Mumble_pb2.Ping):
+        """Record ping statistics."""
         self.ping_stats["last_rcv"] = int(time.time() * 1000)
         ping = int(time.time() * 1000) - self.ping_stats["time_send"]
         old_avg = self.ping_stats["avg"]
@@ -748,7 +751,8 @@ class Mumble(threading.Thread):
             packet = packet[sent:]
 
     def read_control_messages(self):
-        """Read control messages coming from the server"""
+        """Read messages from :attr:`control_socket` and forward valid messages
+        to :func:`dispatch_control_message`."""
 
         try:
             buffer = self.control_socket.recv(TCP_READ_BUFFER_SIZE)
@@ -768,8 +772,6 @@ class Mumble(threading.Thread):
             if len(self.receive_buffer) < size + 6:  # if not length data, read further
                 break
 
-            # self.Log.debug("message received : " + self.receive_buffer[0:size+6].hex())  # for debugging
-
             message = self.receive_buffer[6 : size + 6]  # get the control message
             self.receive_buffer = self.receive_buffer[
                 size + 6 :
@@ -778,7 +780,11 @@ class Mumble(threading.Thread):
             self.dispatch_control_message(type, message)
 
     def dispatch_control_message(self, type: int, message: bytes):
-        """Dispatch control messages based on their type"""
+        """Dispatch control messages based on their protobuf message type.
+
+        :param type: Integer denoting the message type.
+        :param message: The protobuf-encoded message.
+        """
         self.Log.debug("dispatch control message")
         if type == TCP_MSG_TYPE.UDPTunnel:  # audio encapsulated in control message
             self.Log.debug("message: UDPTunnel : %s", message)
@@ -799,7 +805,7 @@ class Mumble(threading.Thread):
             mess = Mumble_pb2.Ping()
             mess.ParseFromString(message)
             self.Log.debug("message: Ping : %s", mess)
-            self.ping_response(mess)
+            self.receive_ping(mess)
 
         elif type == TCP_MSG_TYPE.Reject:
             mess = Mumble_pb2.Reject()
@@ -821,7 +827,7 @@ class Mumble(threading.Thread):
 
             if self.connected == CONN_STATE.AUTHENTICATING:
                 self.connected = CONN_STATE.CONNECTED
-                self.ready_lock.release()  # release the ready-lock
+                self.ready_lock.release()
                 self.callbacks(CALLBACK.CONNECTED)
 
         elif type == TCP_MSG_TYPE.ChannelRemove:
@@ -959,7 +965,9 @@ class Mumble(threading.Thread):
                     self.server_max_image_message_length = int(items[1].strip())
 
     def set_bandwidth(self, bandwidth: int):
-        """Set the total allowed outgoing bandwidth"""
+        """Set the total allowed outgoing bandwidth limit.
+
+        :param bandwidth: The outgoing bandwidth limit in bytes per second."""
         if (
             self.server_max_bandwidth is not None
             and bandwidth > self.server_max_bandwidth
@@ -974,7 +982,10 @@ class Mumble(threading.Thread):
             )  # communicate the update to the outgoing audio manager
 
     def sound_received(self, plaintext: bytes):
-        """Receive a plaintext UDPTunneled MumbleUDP message"""
+        """Receive an unencrypted UDPTunneled MumbleUDP message.
+
+        :param plaintext: The unencoded MumbleUDP message, including header.
+        """
         msg = MumbleUDP.decode_message(self.Log, plaintext)
         match type(msg):
             case MumbleUDP_pb2.Audio:
@@ -1004,12 +1015,17 @@ class Mumble(threading.Thread):
         return self.__opus_profile
 
     def is_ready(self):
-        """Wait for the connection to be fully completed.  To be used in the main thread"""
+        """Wait for the connection to be fully completed."""
         self.ready_lock.acquire()
         self.ready_lock.release()
 
-    def execute_command(self, cmd: Cmd, blocking: bool = True):
-        """Create a command to be sent to the server.  To be used in the main thread"""
+    def execute_command(self, cmd: Cmd, blocking: bool = True) -> threading.Lock:
+        """Enqueue a control command to send to the server.
+
+        :param cmd: The command to send to the server.
+        :param blocking: Whether to block until the command is sent.
+        :return: A ``threading.Lock`` object that locks until the command is sent.
+        """
         self.is_ready()
 
         lock = self.commands.new_cmd(cmd)
@@ -1023,7 +1039,9 @@ class Mumble(threading.Thread):
     # The result of these commands should actually be checked against incoming server updates
 
     def treat_command(self, cmd: Cmd):
-        """Send the awaiting commands to the server.  Used in the pymumble thread."""
+        """Send a control command to the server.
+
+        :param cmd: A command to send to the server."""
         if cmd.cmd == CMD.MOVE:
             userstate = Mumble_pb2.UserState()
             userstate.session = cmd.parameters["session"]
@@ -1203,12 +1221,14 @@ class Mumble(threading.Thread):
         return self.server_max_image_message_length
 
     def my_channel(self):
+        """Return the currently occupied Mumble `channel_id`."""
         return self.channels[self.users.myself["channel_id"]]
 
     def denial_type(self, n: str):
         return Mumble_pb2.PermissionDenied.DenyType.Name(n)
 
     def stop(self):
+        """Disconnect from the server, stop the main loop and close the TLS socket."""
         self.reconnect = None
         self.exit = True
         self.control_socket.close()

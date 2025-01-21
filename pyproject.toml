@@ -36,3 +36,9 @@ addopts = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mumble"]
+
+[dependency-groups]
+dev = [
+    "sphinx-rtd-theme>=3.0.2",
+    "sphinx>=8.1.3",
+]
