@@ -86,7 +86,6 @@ class ServerInfo:
         server_family = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)[0][0]
         self.socket = socket.socket(server_family, socket.SOCK_DGRAM)
         self.socket.connect((host, port))
-        self.latency = None
 
 
 class MumbleServerInfo(threading.Thread):
@@ -260,6 +259,19 @@ class MumbleServerInfo(threading.Thread):
 
 
 class MumbleUDP(threading.Thread):
+    """Handle receiving and sending encrypted UDP Audio and Pings.
+
+    Manages AES-OCB2 encryption with the key and nonces received in the
+    ``MumbleProto.CryptSetup`` control message.
+
+    :param mumble: The :class:`Mumble` object for the connected server.
+    :param key: The AES key received from the server's ``CryptSetup`` message.
+    :param client_nonce: The client nonce received from the server's ``CryptSetup`` message.
+    :param server_nonce: The server nonce received from the server's ``CryptSetup`` message.
+    :param host: The hostname or IP of the remote server.
+    :param port: The UDP port of the remote server.
+    :param debug: Send debugging messages to ``stdout``.
+    """
     def __init__(
         self,
         mumble: Mumble,
@@ -320,6 +332,9 @@ class MumbleUDP(threading.Thread):
                 return
 
     def run(self):
+        """Open a UDP socket to the remote server, send pings every
+        :attr:`PING_INTERVAL` seconds, and continuously receive audio and pings.
+        """
         server_family = socket.getaddrinfo(
             self._host, self._port, type=socket.SOCK_DGRAM
         )[0][0]
