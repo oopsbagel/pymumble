@@ -1,7 +1,9 @@
 """
 OCB2-AES128 cryptography, broadly following the implementation from Mumble
 
-OCB is in the public domain: https://web.cs.ucdavis.edu/~rogaway/ocb/license.htm
+OCB is in the public domain:
+https://web.cs.ucdavis.edu/~rogaway/ocb/license.htm
+https://mailarchive.ietf.org/arch/msg/cfrg/qLTveWOdTJcLn4HP3ev-vrj05Vg/
 """
 
 from typing import Tuple

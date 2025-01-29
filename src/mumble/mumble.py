@@ -259,7 +259,7 @@ class MumbleServerInfo(threading.Thread):
 
 
 class MumbleUDP(threading.Thread):
-    """Handle receiving and sending encrypted UDP Audio and Pings.
+    """Handle sending and receiving encrypted UDP Audio and Pings.
 
     Manages AES-OCB2 encryption with the key and nonces received in the
     ``MumbleProto.CryptSetup`` control message.
@@ -271,7 +271,34 @@ class MumbleUDP(threading.Thread):
     :param host: The hostname or IP of the remote server.
     :param port: The UDP port of the remote server.
     :param debug: Send debugging messages to ``stdout``.
+
+    .. warning:: AES-OCB2 is `considered insecure`_ by the applied cryptography
+       community.
+
+       pymumble and the `official Mumble implementation`_ use a countermeasure
+       described and formally proven in the paper. However, there is no public
+       analysis or audit of our implementations of the countermeasure available
+       at the time of this writing. This therefore qualifies as "`rolling our
+       own crypto`_", something we should `avoid doing`_ and therefore UDP
+       audio is disabled by default in order to provide the best security
+       posture for users without making them decide what risks to accept.
+
+       OCB2 support is included for compatibility with the existing official
+       Mumble server and clients, but care should be taken that UDP audio is
+       only used over an encrypted transport (such as wireguard) if you highly
+       value the confidentiality and integrity of your voice mesages.
+
+       Initialising the Mumble client with ``force_tcp_only=True`` will force
+       audio messages to be sent over the TLS1.2/TLS1.3 encrypted TCP channel.
+       **TCP-only mode is enabled by default.**
+
+    .. _rolling our own crypto: https://www.schneier.com/blog/archives/2011/04/schneiers_law.html
+    .. _avoid doing: https://www.schneier.com/crypto-gram/archives/1998/1015.html#cipherdesign
+    .. _official Mumble implementation: https://github.com/mumble-voip/mumble/pull/4227/files
+    .. _considered insecure: https://eprint.iacr.org/2019/311.pdf
+
     """
+
     def __init__(
         self,
         mumble: Mumble,
@@ -444,7 +471,7 @@ class Mumble(threading.Thread):
         enable_audio: bool = True,
         stereo: bool = False,
         reconnect: bool = False,
-        force_tcp_only: bool = False,
+        force_tcp_only: bool = True,
         loop_rate: float = 0.01,
         debug: bool = False,
     ):
