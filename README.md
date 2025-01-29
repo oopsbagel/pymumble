@@ -3,7 +3,7 @@
 
 ### Requirements
 
-**`libopus` is a mandatory OS library when sending and receiving audio**. Please refer to your package manager to install it.
+[`opus`](https://repology.org/project/opus/packages) is required to send and receive audio.
 
 ### Install with `uv` or `pip`
 
