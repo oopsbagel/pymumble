@@ -453,6 +453,7 @@ class Mumble(threading.Thread):
     :param enable_audio: Send/receive audio.
     :param force_tcp_only: Disable UDP audio/pings and tunnel audio messages through the TCP control channel.
     :param loop_rate: Client tick rate in seconds.
+    :param opus_profile: The opus encoder's intended application.
     :param debug: Send debugging messages to `stdout`.
 
     The `certfile` and `keyfile` parameters take a path to a Mumble certificate
@@ -509,6 +510,7 @@ class Mumble(threading.Thread):
         reconnect: bool = False,
         force_tcp_only: bool = True,
         loop_rate: float = 0.01,
+        opus_profile: OPUS_PROFILE = OPUS_PROFILE.VOIP,
         debug: bool = False,
     ):
         threading.Thread.__init__(self)
@@ -542,7 +544,7 @@ class Mumble(threading.Thread):
         self.keyfile = keyfile
         self.reconnect = reconnect
         self.tokens = tokens
-        self.__opus_profile = OPUS_PROFILE
+        self.__opus_profile = opus_profile
         self.stereo = stereo
         self.enable_audio = enable_audio
         self.loop_rate = loop_rate

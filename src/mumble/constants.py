@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import platform
-from enum import Enum, IntEnum, auto
+from enum import Enum, IntEnum, StrEnum, auto
 
 VERSION = "2.0.0"
 
@@ -31,7 +31,16 @@ TCP_READ_BUFFER_SIZE = (
 )
 MAX_UDP_PACKET_SIZE = 1024  # from the official C++ implementation
 
-OPUS_PROFILE = "audio"  # "voip"
+
+class OPUS_PROFILE(StrEnum):
+    """Defines the encoder's intended application.
+
+    https://opus-codec.org/docs/opus_api-1.5/group__opus__encoderctls.html#ga18fa17dae52ff8f3eaea314204bf1a36
+    """
+
+    VOIP = "voip"  #: Process signal for improved speech intelligibility.
+    AUDIO = "audio"  #: Favor faithfulness to the original input.
+    RESTRICTED_LOWDELAY = "restricted_lowdelay"  #: Configure the minimum possible coding delay by disabling certain modes of operation.
 
 
 # client connection state

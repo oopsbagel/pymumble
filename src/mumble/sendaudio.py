@@ -19,26 +19,39 @@ from .errors import CodecNotSupportedError
 from .messages import VoiceTarget
 
 from . import MumbleUDP_pb2
+from .Mumble_pb2 import CodecVersion
 
 
 class SendAudio:
+    """Manage encoding, packetising and sending 16-bit 48kHz little endian
+    linear PCM audio to the server. Buffering is the responsibility of the
+    caller. Sound is sent immediately upon receipt.
+
+    Sets the :attr:`queue_empty` event when all audio has been sent to the
+    server, and clears the event when new audio is added.
+
+    :param audio_per_packet: Packet audio duration in seconds.
+    :param bandwidth: Maximum total outgoing bandwidth.
+    :param stereo: Whether to send stereo audio.
+    :param opus_profile: The Opus encoder's `intended application`_
+
+    .. _intended application: https://opus-codec.org/docs/opus_api-1.5/group__opus__encoderctls.html#ga18fa17dae52ff8f3eaea314204bf1a36
     """
-    Class managing the sounds that must be sent to the server (best sent in a multiple of audio_per_packet samples)
-    The buffering is the responsibility of the caller, any partial sound will be sent without delay
-    """
+
+    audio_per_packet: float  #: Packet audio duration in fractional seconds.
+    bandwidth: int  #: Maximum total outgoing bandwidth (including header data).
+    queue_empty: (
+        threading.Event
+    )  #: Set when the unsent audio queue is empty, cleared when the queue is populated.
 
     def __init__(
         self,
         mumble_object,
-        audio_per_packet,
-        bandwidth,
-        stereo=False,
-        opus_profile=OPUS_PROFILE,
+        audio_per_packet: float,
+        bandwidth: int,
+        stereo: bool = False,
+        opus_profile: OPUS_PROFILE = OPUS_PROFILE.AUDIO,
     ):
-        """
-        audio_per_packet=packet audio duration in sec
-        bandwidth=maximum total outgoing bandwidth
-        """
         self.mumble_object = mumble_object
 
         self.Log = self.mumble_object.Log
@@ -64,7 +77,7 @@ class SendAudio:
         self.sequence = 0  # current sequence
 
     def send_audio(self):
-        """send the available audio to the server, taking care of the timing"""
+        """Send all available audio to the server, taking care of the timing."""
         if (
             not self.encoder or len(self.pcm) == 0
         ):  # no codec configured or no audio sent
@@ -154,26 +167,26 @@ class SendAudio:
             else:
                 self.mumble_object.udp_thread.encrypt_and_send_message(msg)
 
-    def get_audio_per_packet(self):
-        """return the configured length of a audio packet (in ms)"""
-        return self.audio_per_packet
+    def set_audio_per_packet(self, audio_per_packet: float):
+        """Set the duration of one packet of audio in seconds. Typically, ``0.02``
+        (20ms) or ``0.04`` (40ms). Per the `Opus specification`_, the minimum is
+        2.5ms and the maximum is 60ms.
 
-    def set_audio_per_packet(self, audio_per_packet):
-        """set the length of an audio packet (in ms)"""
+        :param audio_per_packet: The duration of one audio packet in seconds.
+
+        .. _Opus specification: https://opus-codec.org/docs/opus_api-1.5/index.html
+        """
         self.audio_per_packet = audio_per_packet
-        self.create_encoder()
+        self._create_encoder()
 
-    def get_bandwidth(self):
-        """get the configured bandwidth for the audio output"""
-        return self.bandwidth
+    def set_bandwidth(self, bandwidth: int):
+        """Set the outgoing bandwidth. Calculates the header overhead and
+        configures the encoder's actual bitrate.
 
-    def set_bandwidth(self, bandwidth):
-        """set the bandwidth for the audio output"""
+        :param bandwidth: Total outgoing bitrate in bits/second.
+
+        """
         self.bandwidth = bandwidth
-        self._set_bandwidth()
-
-    def _set_bandwidth(self):
-        """do the calculation of the overhead and configure the actual bitrate for the codec"""
         if self.encoder:
             overhead_per_packet = 20  # IP header in bytes
             overhead_per_packet += 3 * int(
@@ -198,8 +211,10 @@ class SendAudio:
 
             self.encoder.bitrate = self.bandwidth - overhead_per_second
 
-    def add_sound(self, pcm):
-        """add sound to be sent (in PCM 16 bits signed format)"""
+    def add_sound(self, pcm: list[bytes]):
+        """Add sound to send to the server to the unsent audio queue.
+
+        :param pcm: Audio encoded in Linear PCM 16-bit 48kHz little endian signed format"""
         if len(pcm) % 2 != 0:  # check that the data is align on 16 bits
             raise Exception("pcm data must be 16 bits")
 
@@ -220,21 +235,25 @@ class SendAudio:
         self.lock.release()
 
     def clear_buffer(self):
+        """Clear the unsent audio buffer."""
         self.lock.acquire()
         self.pcm = []
         self.lock.release()
 
-    def get_buffer_size(self):
-        """return the size of the unsent buffer in sec"""
+    def get_buffer_size(self) -> float:
+        """:return: The size of the unsent buffer in seconds."""
         return sum(len(chunk) for chunk in self.pcm) / 2.0 / SAMPLE_RATE / self.channels
 
-    def set_default_codec(self, codecversion):
-        """Set the default codec to be used to send packets"""
-        self.codec = codecversion
-        self.create_encoder()
+    def set_default_codec(self, codecversion: CodecVersion):
+        """Set the default codec to be used to encode packets.
 
-    def create_encoder(self):
-        """create the encoder instance, and set related constants"""
+        :param codecversion: A MumbleProto.CodecVersion protobuf message.
+        """
+        self.codec = codecversion
+        self._create_encoder()
+
+    def _create_encoder(self):
+        """Create the encoder instance, and set related constants."""
         if not self.codec:
             return ()
 
@@ -247,9 +266,13 @@ class SendAudio:
         else:
             raise CodecNotSupportedError("")
 
-        self._set_bandwidth()
+        self.set_bandwidth(self.bandwidth)
 
-    def set_whisper(self, target_id, channel=False):
+    def set_whisper(self, target_id: list[int] | int, channel=False):
+        """Set whisper target to a specific user, list of users, or channel.
+
+        :param target_id: A session_id or list of session_ids.
+        :param channel: Whether the target session_id is a channel."""
         if not target_id:
             return
         if type(target_id) is int:
@@ -261,6 +284,7 @@ class SendAudio:
         self.mumble_object.execute_command(cmd)
 
     def remove_whisper(self):
+        """Remove the whisper target."""
         self.target = 0
         cmd = VoiceTarget(self.target, [])
         self.mumble_object.execute_command(cmd)
