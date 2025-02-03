@@ -23,6 +23,16 @@ def tcp_decode(msg: bytes) -> list:
     return messages
 
 
+def tcp_encode(msgs: list) -> bytes:
+    msgs_bytes = bytearray()
+    for msg in msgs:
+        msgtype = getattr(TCP_MSG_TYPE, msg.__name__)
+        msgs_bytes.extend(
+            struct.pack("!HL", msgtype, msg.ByteSize()) + msg.SerializeToString()
+        )
+    return msgs_bytes
+
+
 def udp_decode(msg: bytes) -> MumbleUDP_pb2.Audio | MumbleUDP_pb2.Ping:
     msgtype = msg[0]
     content = msg[1:]
@@ -37,9 +47,5 @@ def udp_decode(msg: bytes) -> MumbleUDP_pb2.Audio | MumbleUDP_pb2.Ping:
 
 
 def udp_encode(msg: MumbleUDP_pb2.Audio | MumbleUDP_pb2.Ping) -> bytes:
-    match type(msg):
-        case MumbleUDP_pb2.Audio:
-            msgtype = UDP_MSG_TYPE.Audio
-        case MumbleUDP_pb2.Ping:
-            msgtype = UDP_MSG_TYPE.Ping
+    msgtype = getattr(UDP_MSG_TYPE, msg.__name__)
     return struct.pack("!B", msgtype) + msg.SerializeToString()

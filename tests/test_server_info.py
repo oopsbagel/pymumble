@@ -11,7 +11,7 @@ def test_ping_send_and_response():
         max_user_count=100,
         max_bandwidth_per_user=558000,
     )
-    with Server([server_response], 0.01) as server:
+    with Server(udp_responses=[server_response], latency=0.01) as server:
         with MumbleServerInfo() as m:
             print(server.host, server.udp_port)
             srv = m.add_server(server.host, server.udp_port)
@@ -32,7 +32,7 @@ def test_ping_send_and_response():
 
 def test_ignores_audio_response():
     server_response = MumbleUDP_pb2.Audio(target=1)
-    with Server([server_response], 0.01) as server:
+    with Server(udp_responses=[server_response], latency=0.01) as server:
         with MumbleServerInfo() as m:
             print(server.host, server.udp_port)
             srv = m.add_server(server.host, server.udp_port)
