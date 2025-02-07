@@ -480,7 +480,7 @@ class Mumble(threading.Thread):
         m.start()
 
         # Block until the connection process completes.
-        m.is_ready()
+        m.wait_until_connected()
 
         # Return the current channel object.
         # my_channel() shortcut for self.channels[self.users.myself["channel_id"]]
@@ -580,7 +580,7 @@ class Mumble(threading.Thread):
     def init_connection(self):
         """Set/reset connection specific variables before connecting or reconnecting."""
         self.ready_lock.acquire(
-            False
+            blocking=False
         )  # reacquire the ready-lock in case of reconnection
 
         self.connected = CONN_STATE.NOT_CONNECTED
@@ -1099,10 +1099,18 @@ class Mumble(threading.Thread):
         """return the audio profile string"""
         return self.__opus_profile
 
-    def is_ready(self):
-        """Block until fully connected to the server."""
-        self.ready_lock.acquire()
-        self.ready_lock.release()
+    def wait_until_connected(self, timeout: int = -1) -> bool:
+        """Block until fully connected to the server. Blocks indefinitely by
+        default.
+
+        :param timeout: Block for at most timeout seconds.
+        :return: Whether or not the connection was successful.
+        """
+        if self.ready_lock.acquire(blocking=True, timeout=timeout):
+            self.ready_lock.release()
+            return True
+        else:
+            return False
 
     def execute_command(self, cmd: Cmd, blocking: bool = True) -> threading.Lock:
         """Enqueue a control command to send to the server.

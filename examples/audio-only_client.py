@@ -63,7 +63,7 @@ mumble = Mumble(server, nick, password=pwd, port=port)
 # set up callback called when PCS event occurs
 mumble.callbacks.set_callback(CALLBACK.SOUND_RECEIVED, sound_received_handler)
 mumble.start()
-mumble.is_ready()  # Wait for client is ready
+mumble.wait_until_connected()  # Wait for client is ready
 
 
 # constant capturing sound and sending it to mumble server
