@@ -174,7 +174,7 @@ class SendAudio:
 
         :param audio_per_packet: The duration of one audio packet in seconds.
 
-        .. _Opus specification: https://opus-codec.org/docs/opus_api-1.5/index.html
+        .. _Opus specification: https://datatracker.ietf.org/doc/html/rfc6716#section-3.1
         """
         self.audio_per_packet = audio_per_packet
         self._create_encoder()
