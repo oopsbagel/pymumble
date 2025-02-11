@@ -168,14 +168,18 @@ class SendAudio:
                 self.mumble_object.udp_thread.encrypt_and_send_message(msg)
 
     def set_audio_per_packet(self, audio_per_packet: float):
-        """Set the duration of one packet of audio in seconds. Typically, ``0.02``
-        (20ms) or ``0.04`` (40ms). Per the `Opus specification`_, the minimum is
-        2.5ms and the maximum is 60ms.
+        """Set the duration of one packet of audio in seconds. Allowed frame
+        durations are 2.5, 5, 10, 20, 40 or 60 ms per the `Opus
+        specification`_.
 
         :param audio_per_packet: The duration of one audio packet in seconds.
 
         .. _Opus specification: https://datatracker.ietf.org/doc/html/rfc6716#section-3.1
         """
+        if audio_per_packet not in (0.0025, 0.005, 0.01, 0.02, 0.04, 0.06):
+            raise ValueError(
+                "Invalid frame duration. Must be 2.5, 5, 10, 20, 40 or 60 ms."
+            )
         self.audio_per_packet = audio_per_packet
         self._create_encoder()
 
