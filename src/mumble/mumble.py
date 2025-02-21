@@ -569,7 +569,7 @@ class Mumble(threading.Thread):
 
     def __enter__(self) -> Mumble:
         self.start()
-        self.is_ready()  # block until the client is connected
+        self.wait_until_connected()  # block until the client is connected
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> t.Literal[False]:
@@ -1119,7 +1119,7 @@ class Mumble(threading.Thread):
         :param blocking: Whether to block until the command is sent.
         :return: A ``threading.Lock`` object that locks until the command is sent.
         """
-        self.is_ready()
+        self.wait_until_connected()
 
         lock = self.commands.new_cmd(cmd)
         if blocking and self.mumble_thread is not threading.current_thread():
