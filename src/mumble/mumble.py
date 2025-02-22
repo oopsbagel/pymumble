@@ -871,183 +871,97 @@ class Mumble(threading.Thread):
         :param message: The protobuf-encoded message.
         """
         self.Log.debug("dispatch control message")
+
+        try:
+            msgtype = TCP_MSG_TYPE(type)
+        except ValueError:
+            self.Log.warn("received TCP message of unknown type, ignoring")
+            return
+
         if type == TCP_MSG_TYPE.UDPTunnel:  # audio encapsulated in control message
             self.Log.debug("message: UDPTunnel : %s", message)
             if self.enable_audio and self.send_audio:
                 self.sound_received(message)
+            return
 
-        elif type == TCP_MSG_TYPE.Version:
-            mess = Mumble_pb2.Version()
-            mess.ParseFromString(message)
-            self.Log.debug("message: Version : %s", mess)
+        MsgClass = getattr(Mumble_pb2, msgtype.name)
+        mess = MsgClass()
+        mess.ParseFromString(message)
+        self.Log.debug(f"message: {msgtype.name} : {mess}")
 
-        elif type == TCP_MSG_TYPE.Authenticate:
-            mess = Mumble_pb2.Authenticate()
-            mess.ParseFromString(message)
-            self.Log.debug("message: Authenticate : %s", mess)
+        match msgtype:
+            case TCP_MSG_TYPE.Ping:
+                self.receive_ping()
 
-        elif type == TCP_MSG_TYPE.Ping:
-            mess = Mumble_pb2.Ping()
-            mess.ParseFromString(message)
-            self.Log.debug("message: Ping : %s", mess)
-            self.receive_ping()
-
-        elif type == TCP_MSG_TYPE.Reject:
-            mess = Mumble_pb2.Reject()
-            mess.ParseFromString(message)
-            self.Log.debug("message: reject : %s", mess)
-            self.connected = CONN_STATE.FAILED
-            self.ready_lock.release()
-            raise ConnectionRejectedError(mess.reason)
-
-        elif (
-            type == TCP_MSG_TYPE.ServerSync
-        ):  # this message finishes the connection process
-            mess = Mumble_pb2.ServerSync()
-            mess.ParseFromString(message)
-            self.Log.debug("message: serversync : %s", mess)
-            self.users.set_myself(mess.session)
-            self.server_max_bandwidth = mess.max_bandwidth
-            self.set_bandwidth(mess.max_bandwidth)
-
-            if self.connected == CONN_STATE.AUTHENTICATING:
-                self.connected = CONN_STATE.CONNECTED
+            case TCP_MSG_TYPE.Reject:
+                self.connected = CONN_STATE.FAILED
                 self.ready_lock.release()
-                self.callbacks(CALLBACK.CONNECTED)
+                raise ConnectionRejectedError(mess.reason)
 
-        elif type == TCP_MSG_TYPE.ChannelRemove:
-            mess = Mumble_pb2.ChannelRemove()
-            mess.ParseFromString(message)
-            self.Log.debug("message: ChannelRemove : %s", mess)
+            case (
+                TCP_MSG_TYPE.ServerSync
+            ):  # this message finishes the connection process
+                self.users.set_myself(mess.session)
+                self.server_max_bandwidth = mess.max_bandwidth
+                self.set_bandwidth(mess.max_bandwidth)
+                if self.connected == CONN_STATE.AUTHENTICATING:
+                    self.connected = CONN_STATE.CONNECTED
+                    self.ready_lock.release()
+                    self.callbacks(CALLBACK.CONNECTED)
 
-            self.channels.remove(mess.channel_id)
+            case TCP_MSG_TYPE.ChannelRemove:
+                self.channels.remove(mess.channel_id)
 
-        elif type == TCP_MSG_TYPE.ChannelState:
-            mess = Mumble_pb2.ChannelState()
-            mess.ParseFromString(message)
-            self.Log.debug("message: channelstate : %s", mess)
+            case TCP_MSG_TYPE.ChannelState:
+                self.channels.update(mess)
 
-            self.channels.update(mess)
+            case TCP_MSG_TYPE.UserRemove:
+                self.users.remove(mess)
 
-        elif type == TCP_MSG_TYPE.UserRemove:
-            mess = Mumble_pb2.UserRemove()
-            mess.ParseFromString(message)
-            self.Log.debug("message: UserRemove : %s", mess)
+            case TCP_MSG_TYPE.UserState:
+                self.users.update(mess)
 
-            self.users.remove(mess)
+            case TCP_MSG_TYPE.TextMessage:
+                self.callbacks(CALLBACK.TEXT_MESSAGE_RECEIVED, mess)
 
-        elif type == TCP_MSG_TYPE.UserState:
-            mess = Mumble_pb2.UserState()
-            mess.ParseFromString(message)
-            self.Log.debug("message: userstate : %s", mess)
+            case TCP_MSG_TYPE.PermissionDenied:
+                self.callbacks(CALLBACK.PERMISSION_DENIED, mess)
 
-            self.users.update(mess)
+            case TCP_MSG_TYPE.ACL:
+                self.channels[mess.channel_id].update_acl(mess)
+                self.callbacks(CALLBACK.ACL_RECEIVED, mess)
 
-        elif type == TCP_MSG_TYPE.BanList:
-            mess = Mumble_pb2.BanList()
-            mess.ParseFromString(message)
-            self.Log.debug("message: BanList : %s", mess)
+            case TCP_MSG_TYPE.CryptSetup:
+                if not self.force_tcp_only:
+                    self.udp_thread = MumbleUDP(
+                        self,
+                        mess.key,
+                        bytearray(mess.client_nonce),
+                        bytearray(mess.server_nonce),
+                        host=self.host,
+                        port=self.port,
+                        debug=self.debug,
+                    )
+                    self.udp_thread.start()
 
-        elif type == TCP_MSG_TYPE.TextMessage:
-            mess = Mumble_pb2.TextMessage()
-            mess.ParseFromString(message)
-            self.Log.debug("message: TextMessage : %s", mess)
+            case TCP_MSG_TYPE.ContextActionModify:
+                self.callbacks(CALLBACK.CONTEXT_ACTION_RECEIVED, mess)
 
-            self.callbacks(CALLBACK.TEXT_MESSAGE_RECEIVED, mess)
+            case TCP_MSG_TYPE.CodecVersion:
+                if self.send_audio:
+                    self.send_audio.set_default_codec(mess)
 
-        elif type == TCP_MSG_TYPE.PermissionDenied:
-            mess = Mumble_pb2.PermissionDenied()
-            mess.ParseFromString(message)
-            self.Log.debug("message: PermissionDenied : %s", mess)
-
-            self.callbacks(CALLBACK.PERMISSION_DENIED, mess)
-
-        elif type == TCP_MSG_TYPE.ACL:
-            mess = Mumble_pb2.ACL()
-            mess.ParseFromString(message)
-            self.Log.debug("message: ACL : %s", mess)
-            self.channels[mess.channel_id].update_acl(mess)
-            self.callbacks(CALLBACK.ACL_RECEIVED, mess)
-
-        elif type == TCP_MSG_TYPE.QueryUsers:
-            mess = Mumble_pb2.QueryUsers()
-            mess.ParseFromString(message)
-            self.Log.debug("message: QueryUsers : %s", mess)
-
-        elif type == TCP_MSG_TYPE.CryptSetup:
-            mess = Mumble_pb2.CryptSetup()
-            mess.ParseFromString(message)
-            self.Log.debug("message: CryptSetup : %s", mess)
-            if not self.force_tcp_only:
-                self.udp_thread = MumbleUDP(
-                    self,
-                    mess.key,
-                    bytearray(mess.client_nonce),
-                    bytearray(mess.server_nonce),
-                    host=self.host,
-                    port=self.port,
-                    debug=self.debug,
-                )
-                self.udp_thread.start()
-
-        elif type == TCP_MSG_TYPE.ContextActionModify:
-            mess = Mumble_pb2.ContextActionModify()
-            mess.ParseFromString(message)
-            self.Log.debug("message: ContextActionModify : %s", mess)
-
-            self.callbacks(CALLBACK.CONTEXT_ACTION_RECEIVED, mess)
-
-        elif type == TCP_MSG_TYPE.ContextAction:
-            mess = Mumble_pb2.ContextAction()
-            mess.ParseFromString(message)
-            self.Log.debug("message: ContextAction : %s", mess)
-
-        elif type == TCP_MSG_TYPE.UserList:
-            mess = Mumble_pb2.UserList()
-            mess.ParseFromString(message)
-            self.Log.debug("message: UserList : %s", mess)
-
-        elif type == TCP_MSG_TYPE.VoiceTarget:
-            mess = Mumble_pb2.VoiceTarget()
-            mess.ParseFromString(message)
-            self.Log.debug("message: VoiceTarget : %s", mess)
-
-        elif type == TCP_MSG_TYPE.PermissionQuery:
-            mess = Mumble_pb2.PermissionQuery()
-            mess.ParseFromString(message)
-            self.Log.debug("message: PermissionQuery : %s", mess)
-
-        elif type == TCP_MSG_TYPE.CodecVersion:
-            mess = Mumble_pb2.CodecVersion()
-            mess.ParseFromString(message)
-            self.Log.debug("message: CodecVersion : %s", mess)
-            if self.send_audio:
-                self.send_audio.set_default_codec(mess)
-
-        elif type == TCP_MSG_TYPE.UserStats:
-            mess = Mumble_pb2.UserStats()
-            mess.ParseFromString(message)
-            self.Log.debug("message: UserStats : %s", mess)
-
-        elif type == TCP_MSG_TYPE.RequestBlob:
-            mess = Mumble_pb2.RequestBlob()
-            mess.ParseFromString(message)
-            self.Log.debug("message: RequestBlob : %s", mess)
-
-        elif type == TCP_MSG_TYPE.ServerConfig:
-            mess = Mumble_pb2.ServerConfig()
-            mess.ParseFromString(message)
-            self.Log.debug("message: ServerConfig : %s", mess)
-            for line in str(mess).split("\n"):
-                items = line.split(":")
-                if len(items) != 2:
-                    continue
-                if items[0] == "allow_html":
-                    self.server_allow_html = items[1].strip() == "true"
-                elif items[0] == "message_length":
-                    self.server_max_message_length = int(items[1].strip())
-                elif items[0] == "image_message_length":
-                    self.server_max_image_message_length = int(items[1].strip())
+            case TCP_MSG_TYPE.ServerConfig:
+                for line in str(mess).split("\n"):
+                    items = line.split(":")
+                    if len(items) != 2:
+                        continue
+                    if items[0] == "allow_html":
+                        self.server_allow_html = items[1].strip() == "true"
+                    elif items[0] == "message_length":
+                        self.server_max_message_length = int(items[1].strip())
+                    elif items[0] == "image_message_length":
+                        self.server_max_image_message_length = int(items[1].strip())
 
     def set_bandwidth(self, bandwidth: int):
         """Set the total allowed outgoing bandwidth limit.
