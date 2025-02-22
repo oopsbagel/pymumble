@@ -180,7 +180,7 @@ class MumbleServerInfo(threading.Thread):
         )
         msg = struct.pack("!B", UDP_MSG_TYPE.Ping) + ping.SerializeToString()
         self.Log.debug("pinging %s %s" % (server.host, server.port))
-        server.socket.sendto(msg, (server.host, server.port))
+        server.socket.send(msg)
 
     def _receive_ping(self, ping: MumbleUDP_pb2.Ping, server: ServerInfo) -> None:
         """Record server information contained in `ping` in `server`.
