@@ -76,3 +76,29 @@ def test_context_manager(server_connect):
     with Server(tls_responses=server_connect, latency=0.01) as server:
         with Mumble(server.host, "pi", port=server.tls_port, debug=True) as m:
             assert m.my_channel()["name"] == "Root"
+
+
+def test_send_text_message_to_channel(server_connect):
+    with Server(tls_responses=server_connect, latency=0.01) as server:
+        with Mumble(server.host, "pi", port=server.tls_port, debug=True) as m:
+            m.my_channel().send_text_message("free luigi!")
+    assert len(server.tls_received_msgs) == 3  # Version, Authenticate, TextMessage
+    txt = server.tls_received_msgs[-1][0]
+    assert type(txt) is mpb.TextMessage
+    assert txt.message == "free luigi!"
+    assert txt.session == [11]  # from UserState
+    assert txt.channel_id == [0]  # from UserState
+
+
+def test_send_text_message_to_user(server_connect):
+    # other_user_connects = mpb.UserState(name="orbital", session=12, channel_id=0)
+    # server_connect[-1].extend([other_user_connects])
+    with Server(tls_responses=server_connect, latency=0.01) as server:
+        with Mumble(server.host, "pi", port=server.tls_port, debug=True) as m:
+            m.my_channel().send_text_message("free luigi!")
+    assert len(server.tls_received_msgs) == 3  # Version, Authenticate, TextMessage
+    txt = server.tls_received_msgs[-1][0]
+    assert type(txt) is mpb.TextMessage
+    assert txt.message == "free luigi!"
+    assert txt.session == [11]  # from UserState
+    assert txt.channel_id == [0]  # from UserState

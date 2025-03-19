@@ -780,6 +780,9 @@ class Mumble(threading.Thread):
                 self.control_socket.close()
                 self.connected = CONN_STATE.NOT_CONNECTED
 
+        self.Log.debug("shutting down")
+        self.Log.handlers.clear()
+
     def ping(self):
         """Send a :class:`Mumble_pb2.Ping` message to the server."""
         ping = Mumble_pb2.Ping()
@@ -898,9 +901,7 @@ class Mumble(threading.Thread):
                 self.ready_lock.release()
                 raise ConnectionRejectedError(mess.reason)
 
-            case (
-                TCP_MSG_TYPE.ServerSync
-            ):  # this message finishes the connection process
+            case TCP_MSG_TYPE.ServerSync:  # this message finishes the connection process
                 self.users.set_myself(mess.session)
                 self.server_max_bandwidth = mess.max_bandwidth
                 self.set_bandwidth(mess.max_bandwidth)
@@ -1228,7 +1229,7 @@ class Mumble(threading.Thread):
         return self.server_max_image_message_length
 
     def my_channel(self):
-        """Return the currently occupied Mumble `channel_id`."""
+        """Return the currently occupied Mumble :class:`Channel`."""
         return self.channels[self.users.myself["channel_id"]]
 
     def denial_type(self, n: str):

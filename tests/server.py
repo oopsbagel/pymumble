@@ -4,6 +4,7 @@ import ssl
 import threading
 import time
 from collections import deque
+from mumble.Mumble_pb2 import Ping
 
 from tests.msgs import tcp_decode, tcp_encode, udp_decode, udp_encode
 
@@ -59,10 +60,17 @@ class Server(threading.Thread):
 
     def receive_tls(self, sock):
         data = sock.recv(1024)
+        if len(data) == 0:
+            return  # the socket is closed XXX gracefully handle otherwise
         received_msgs = tcp_decode(data)
         self.tls_received_msgs.append(received_msgs)
 
-        if len(self.tls_responses) != 0:
+        if len(received_msgs) == 1 and type(received_msgs[0]) is Ping:
+            pong = tcp_encode([Ping(timestamp=received_msgs[0].timestamp)])
+            if sock.send(pong) != len(pong):
+                raise RuntimeError("Unable to send ping response to client.")
+
+        elif len(self.tls_responses) != 0:
             response_msgs = self.tls_responses.popleft()
             if response_msgs is not None:
                 responses = tcp_encode(response_msgs)
