@@ -601,7 +601,7 @@ class Mumble(threading.Thread):
         self.channels = Channels(self)
         self.blobs = Blobs(self)
         if self.enable_audio:
-            from .sendaudio import SendAudio
+            from .audio import SendAudio
 
             self.send_audio = SendAudio(
                 self,

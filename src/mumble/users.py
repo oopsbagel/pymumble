@@ -67,7 +67,7 @@ class User(dict):
         self.update(message)
 
         if mumble_object.enable_audio:
-            from .receivedaudioqueue import ReceivedAudioQueue
+            from .audio import ReceivedAudioQueue
 
             self.sound = ReceivedAudioQueue(
                 self.mumble_object
