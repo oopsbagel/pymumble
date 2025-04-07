@@ -1,3 +1,5 @@
+**NOTE**: pymumble is currently being reworked from a stateful application object to a *library* that can be used both as a traditional client and as an independent collection of mostly stateless functionality. The documentation is kept more or less up to date, but until 2.0.0 is released, nothing is stable.
+
 # pymumble - Python Mumble client library
 ## Installation
 
