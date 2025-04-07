@@ -30,17 +30,19 @@ uv sync
 #     "pymumble>=2",
 # ]
 # ///
+
 from mumble import Mumble
+from subprocess import PIPE, Popen
 
-with Mumble("127.0.0.1", "A Weedy Samaritan") as m:
-  m.my_channel().send_text_message(
-      f"Hello, {", ".join(u["name"] for u in m.my_channel().get_users())}. You're all Brian! You're all individuals!"
-  )
+with Mumble("127.0.0.1", "A Weedy Samaritan", debug=False) as m:
+    usernames = ", ".join(u["name"] for u in m.my_channel().get_users())
+    m.my_channel().send_text_message(
+        f"Hello, {usernames}. You're all Brian! You're all individuals!"
+    )
 
-  # play audio.wav
-  from subprocess import PIPE, Popen
-  sound = Popen("ffmpeg -i - -ac 1 -f s32le - < audio.wav".split(), stdout=.PIPE).stdout.read()
-  m.send_audio.add_sound(sound).wait()
+    audio_file = "./audio.opus"
+    sound = Popen("ffmpeg -i audio.opus -ar 48000 -b:a 64k -f s16le -".split(), stdout=PIPE).stdout.read()
+    m.send_audio.add_sound(sound).wait()
 ```
 
 ## BREAKING CHANGES and updates in pymumble 2.0.0

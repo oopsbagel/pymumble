@@ -215,11 +215,11 @@ class SendAudio:
 
             self.encoder.bitrate = self.bandwidth - overhead_per_second
 
-    def add_sound(self, pcm: list[bytes]):
+    def add_sound(self, pcm: list[bytes]) -> threading.Event:
         """Add sound to send to the server to the unsent audio queue.
 
         :param pcm: Audio encoded in Linear PCM 16-bit 48kHz little endian signed format"""
-        if len(pcm) % 2 != 0:  # check that the data is align on 16 bits
+        if len(pcm) % 2 != 0:  # check that the data is aligned on 2 bytes
             raise Exception("pcm data must be 16 bits")
 
         self.queue_empty.clear()
@@ -237,6 +237,7 @@ class SendAudio:
         for i in range(initial_offset, len(pcm), samples):
             self.pcm.append(pcm[i : i + samples])
         self.lock.release()
+        return self.queue_empty
 
     def clear_buffer(self):
         """Clear the unsent audio buffer."""
