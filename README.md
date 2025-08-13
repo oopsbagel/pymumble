@@ -17,7 +17,7 @@ One of the following:
 ### Install from git
 
 ```sh
-git clone https://git.sr.ht/~oopsbagel/pymumble
+git clone https://codeberg.org/pymumble/pymumble.git
 cd pymumble
 uv sync
 ```
