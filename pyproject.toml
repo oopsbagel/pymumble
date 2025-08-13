@@ -1,6 +1,6 @@
 [project]
 name = "pymumble"
-version = "2.0.0-nightly"
+version = "2.0.0"
 description = "Python Mumble library"
 readme = "README.md"
 authors = [
