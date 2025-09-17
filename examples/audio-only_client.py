@@ -23,17 +23,22 @@
 # Works on MacOS. Does NOT work on RPi 3B+ (I cannot figure out why. Help will
 # be much appreciated)
 
+import argparse
 from mumble import Mumble
-from mumble.callbacks import CALLBACK
 import pyaudio
 
-# Connection details for mumble server. Hardcoded for now, will have to be
-# command line arguments eventually
-pwd = ""  # password
-server = "sf.guildbit.com"  # server address
-nick = "audio-only_client"
-port = 50013  # port number
+parser = argparse.ArgumentParser(description="audio only mumble client")
 
+parser.add_argument("--server", "-s", required=True)
+parser.add_argument("--port", "-P", type=int, default=64738)
+parser.add_argument("--name", "-n", required=True)
+parser.add_argument("--passwd", "-p", default="")
+args = parser.parse_args()
+
+server = args.server
+port = args.port
+nick = args.name
+pwd = args.passwd
 
 # pyaudio set up
 CHUNK = 1024
@@ -42,37 +47,41 @@ CHANNELS = 1
 RATE = 48000  # pymumble soundchunk.pcm is 48000Hz
 
 p = pyaudio.PyAudio()
-stream = p.open(
+output_stream = p.open(
     format=FORMAT,
     channels=CHANNELS,
     rate=RATE,
-    input=True,  # enable both talk
-    output=True,  # and listen
+    output=True,
+    frames_per_buffer=CHUNK,
+)
+input_stream = p.open(
+    format=FORMAT,
+    channels=CHANNELS,
+    rate=RATE,
+    input=True,
     frames_per_buffer=CHUNK,
 )
 
 
-# mumble client set up
 def sound_received_handler(user, soundchunk):
     """play sound received from mumble server upon its arrival"""
-    stream.write(soundchunk.pcm)
+    output_stream.write(soundchunk.pcm)
 
 
 # Spin up a client and connect to mumble server
 mumble = Mumble(server, nick, password=pwd, port=port)
-# set up callback called when PCS event occurs
-mumble.callbacks.set_callback(CALLBACK.SOUND_RECEIVED, sound_received_handler)
+mumble.callbacks.SOUND_RECEIVED.set_handler(sound_received_handler)
 mumble.start()
-mumble.wait_until_connected()  # Wait for client is ready
-
+mumble.wait_until_connected()
 
 # constant capturing sound and sending it to mumble server
 while True:
-    data = stream.read(CHUNK, exception_on_overflow=False)
+    data = input_stream.read(CHUNK, exception_on_overflow=False)
     mumble.send_audio.add_sound(data)
 
-
-# close the stream and pyaudio instance
-stream.stop_stream()
-stream.close()
+# close the streams and pyaudio instance
+input_stream.stop_stream()
+input_stream.close()
+output_stream.stop_stream()
+output_stream.close()
 p.terminate()

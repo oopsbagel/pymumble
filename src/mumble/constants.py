@@ -33,9 +33,9 @@ MAX_UDP_PACKET_SIZE = 1024  # from the official C++ implementation
 
 
 class OPUS_PROFILE(StrEnum):
-    """Defines the encoder's intended application.
+    """Defines the encoder's `intended application`_.
 
-    https://opus-codec.org/docs/opus_api-1.5/group__opus__encoderctls.html#ga18fa17dae52ff8f3eaea314204bf1a36
+    .. _intended application: https://opus-codec.org/docs/opus_api-1.5/group__opus__encoderctls.html#ga18fa17dae52ff8f3eaea314204bf1a36
     """
 
     VOIP = "voip"  #: Process signal for improved speech intelligibility.
@@ -101,24 +101,6 @@ class AUDIO_CODEC(IntEnum):
     SPEEX = 2
     CELT_BETA = 3
     OPUS = 4
-
-
-class CALLBACK(Enum):
-    "Callback names, used as keys when registering/calling callbacks."
-
-    CONNECTED = auto()
-    DISCONNECTED = auto()
-    CHANNEL_CREATED = auto()
-    CHANNEL_UPDATED = auto()
-    CHANNEL_REMOVED = auto()
-    USER_CREATED = auto()
-    USER_UPDATED = auto()
-    USER_REMOVED = auto()
-    SOUND_RECEIVED = auto()
-    TEXT_MESSAGE_RECEIVED = auto()
-    CONTEXT_ACTION_RECEIVED = auto()
-    ACL_RECEIVED = auto()
-    PERMISSION_DENIED = auto()
 
 
 class CMD(Enum):

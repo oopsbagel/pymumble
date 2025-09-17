@@ -7,7 +7,6 @@ import opuslib
 
 from .constants import (
     AUDIO_CODEC,
-    CALLBACK,
     SAMPLE_RATE,
     SEQUENCE_DURATION,
     TCP_READ_BUFFER_SIZE,
@@ -68,7 +67,7 @@ class ReceivedAudioQueue:
                 pcm, sequence, len(pcm), calculated_time, type, target
             )
 
-            if not self.mumble_object.callbacks.get_callback(CALLBACK.SOUND_RECEIVED):
+            if not self.mumble_object.callbacks.SOUND_RECEIVED.get_handlers():
                 self.queue.appendleft(newsound)
 
                 if len(self.queue) > 1 and self.queue[0].time < self.queue[1].time:

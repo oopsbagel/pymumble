@@ -1,99 +1,92 @@
-# -*- coding: utf-8 -*-
-
-from .errors import UnknownCallbackError
-from .constants import CALLBACK
-import threading
+from dataclasses import dataclass
 
 
-class CallBacks(dict):
+class Callback:
     """
-    Define the callbacks that can be registered by the application.
-    Multiple functions can be assigned to a callback using "add_callback"
+    Certain Mumble session events may call back to user defined functions.
+    More than one handler per callback may be defined with :func:`add_handler`.
+    These callbacks may pass data to these handler functions. See
+    :class:`Callbacks` for a list of parameters per callback type.
 
-    The call is done from within the pymumble loop thread, it's important to
-    keep processing short to avoid delays on audio transmission
+    .. note:: Handlers are executed within the main loop thread, so it's
+              important to keep processing short to avoid delays with audio
+              processing. Handlers that expect a long runtime should spawn a
+              new thread.
+
+    .. code-block:: python
+
+        import mumble
+
+        m = mumble.Mumble("127.0.0.1", user="echobot")
+
+        def echo_soundchunk(user, soundchunk):
+            "Echo all received sounds."
+            m.send_audio.add_sound(soundchunk.pcm)
+
+        def print_sender_name(user, soundchunk):
+            print(f"Received sound from {user['name']}")
+
+        m.callbacks.SOUND_RECEIVED.add_handler(echo_soundchunk)
+        m.callbacks.SOUND_RECEIVED.add_handler(print_sender_name)
+        m.start()
+        m.join()
     """
 
     def __init__(self):
-        self.update(
-            {
-                CALLBACK.CONNECTED: None,  # Connection succeeded
-                CALLBACK.DISCONNECTED: None,  # Connection as been dropped
-                CALLBACK.CHANNEL_CREATED: None,  # send the created channel object as parameter
-                CALLBACK.CHANNEL_UPDATED: None,  # send the updated channel object and a dict with all the modified fields as parameter
-                CALLBACK.CHANNEL_REMOVED: None,  # send the removed channel object as parameter
-                CALLBACK.USER_CREATED: None,  # send the added user object as parameter
-                CALLBACK.USER_UPDATED: None,  # send the updated user object and a dict with all the modified fields as parameter
-                CALLBACK.USER_REMOVED: None,  # send the removed user object and the mumble message as parameter
-                CALLBACK.SOUND_RECEIVED: None,  # send the user object that received the sound and the SoundChunk object itself
-                CALLBACK.TEXT_MESSAGE_RECEIVED: None,  # Send the received message
-                CALLBACK.CONTEXT_ACTION_RECEIVED: None,  # Send the contextaction message
-                CALLBACK.ACL_RECEIVED: None,  # Send the received ACL permissions object
-                CALLBACK.PERMISSION_DENIED: None,  # Permission Denied for some action, send information
-            }
-        )
+        self.handlers = list()
 
-    def set_callback(self, callback, dest):
-        """Define the function to call for a specific callback.  Suppress any existing callback function"""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
+    def call_handlers(self, *pos_parameters):
+        "Call the registered handler functions for this callback."
+        for function in self.handlers:
+            function(*pos_parameters)
 
-        self[callback] = [dest]
+    def get_handlers(self):
+        "Return the handler functions assigned to this callback."
+        return self.handlers
 
-    def add_callback(self, callback, dest):
-        """Add the function to call for a specific callback."""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
+    def set_handler(self, function):
+        """
+        Register the _only_ handler function to call for this callback.
+        Removes all other handler functions for this callback.
+        """
+        if not callable(function):
+            raise ValueError("Callback handler must be callable.")
+        self.handlers = [function]
 
-        if self[callback] is None:
-            self[callback] = list()
-        self[callback].append(dest)
+    def clear_handlers(self):
+        "Remove all handler functions for this callback."
+        self.handlers = list()
 
-    def get_callback(self, callback):
-        """Get the functions assigned to a callback as a list. Return None if no callback defined"""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
+    def add_handler(self, function):
+        "Append a handler function to the list for this callback."
+        if not callable(function):
+            raise ValueError("Callback handler must be callable.")
+        self.handlers.append(function)
 
-        return self[callback]
+    def remove_handler(self, function):
+        "Remove all instances of the provided handler function from this callback."
+        if not callable(function):
+            raise ValueError("Callback handler must be callable.")
+        while function in self.handlers:
+            self.handlers.remove(function)
 
-    def remove_callback(self, callback, dest):
-        """Remove a specific function from a specific callback.  Function object must be the one added before."""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
 
-        if self[callback] is None or dest not in self[callback]:
-            raise UnknownCallbackError(
-                'Function not registered for callback "%s".' % callback
-            )
-
-        self[callback].remove(dest)
-        if len(self[callback]) == 0:
-            self[callback] = None
-
-    def reset_callback(self, callback):
-        """remove functions for a defined callback"""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
-
-        self[callback] = None
-
-    def call_callback(self, callback, *pos_parameters):
-        """Call all the registered function for a specific callback."""
-        if callback not in self:
-            raise UnknownCallbackError('Callback "%s" does not exists.' % callback)
-
-        if self[callback]:
-            for func in self[callback]:
-                if callback is CALLBACK.TEXT_MESSAGE_RECEIVED:
-                    thr = threading.Thread(target=func, args=pos_parameters)
-                    thr.start()
-                else:
-                    func(*pos_parameters)
-
-    def __call__(self, callback, *pos_parameters):
-        """shortcut to be able to call the dict element as a function"""
-        self.call_callback(callback, *pos_parameters)
-
-    def get_callbacks_list(self):
-        """Get a list of all callbacks"""
-        return list(self.keys())
+@dataclass(slots=True)
+class Callbacks:
+    CONNECTED = (
+        Callback()
+    )  #: Called when the client has finished connecting. Sends no parameters.
+    DISCONNECTED = (
+        Callback()
+    )  #: Called when the client has disconnected. Sends no parameters.
+    CHANNEL_CREATED = Callback()  #: Called when the client detects a new channel. Sends the channel object as the only parameter.
+    CHANNEL_UPDATED = Callback()  #: Called when the client receives a channel update. Sends the updated channel object and a dict with all the modified fields as two parameters.
+    CHANNEL_REMOVED = Callback()  #: Called when a channel is removed. Sends the removed channel object as the only parameter.
+    USER_CREATED = Callback()  #: Called when a new user connects. Sends the added user object as the only parameter.
+    USER_UPDATED = Callback()  #: Called when a user's state is updated. Sends the updated user object and a dict with all the modified fields as two parameters.
+    USER_REMOVED = Callback()  #: Called when a user is removed. Sends the removed User object and the mumble message as the only parameter.
+    SOUND_RECEIVED = Callback()  #: Called when a sound is received. Sends the User object that received the sound and the SoundChunk object itself as two parameters.
+    TEXT_MESSAGE_RECEIVED = Callback()  #: Called when a text message is received. Sends the received TextMessage protobuf message as the only parameter.
+    CONTEXT_ACTION_RECEIVED = Callback()  #: Called when a custom context menu is added or removed. Sends the received ContextActionModify protobuf message as the only parameter.
+    ACL_RECEIVED = Callback()  #: Called when an ACL message is received. Sends the received ACL protobuf message as the only parameter.
+    PERMISSION_DENIED = Callback()  #: Called when the PermissionDenied message is received. Sends the PermissionDenied protobuf message as the only parameter.

@@ -10,12 +10,11 @@ import google.protobuf.message as protobuf_message
 import typing as t
 
 from .blobs import Blobs
-from .callbacks import CallBacks
+from .callbacks import Callbacks
 from .channels import Channels
 from .commands import Commands
 from .constants import (
     CONN_STATE,
-    CALLBACK,
     CMD,
     TCP_MSG_TYPE,
     UDP_MSG_TYPE,
@@ -431,8 +430,8 @@ class MumbleUDP(threading.Thread):
         )
         if newsound is None:  # audio has been disabled for this user
             return
-        mumble.callbacks(
-            CALLBACK.SOUND_RECEIVED, mumble.users[audio.sender_session], newsound
+        mumble.callbacks.SOUND_RECEIVED.call_handlers(
+            mumble.users[audio.sender_session], newsound
         )
 
 
@@ -558,7 +557,7 @@ class Mumble(threading.Thread):
         else:
             self.Log.debug("Working in MONO mode.")
 
-        self.callbacks = CallBacks()  # callbacks management
+        self.callbacks = Callbacks()
 
         self.ready_lock = (
             threading.Lock()
@@ -598,13 +597,9 @@ class Mumble(threading.Thread):
         self.server_max_message_length = 5000
         self.server_max_image_message_length = 131072
 
-        self.users = Users(
-            self, self.callbacks
-        )  # contains the server's connected users information
-        self.channels = Channels(
-            self, self.callbacks
-        )  # contains the server's channels information
-        self.blobs = Blobs(self)  # manage the blob objects
+        self.users = Users(self)
+        self.channels = Channels(self)
+        self.blobs = Blobs(self)
         if self.enable_audio:
             from .sendaudio import SendAudio
 
@@ -657,10 +652,10 @@ class Mumble(threading.Thread):
                 self.connected = CONN_STATE.NOT_CONNECTED
 
             if not self.reconnect or not self.parent_thread.is_alive():
-                self.callbacks(CALLBACK.DISCONNECTED)
+                self.callbacks.DISCONNECTED.call_handlers()
                 break
 
-            self.callbacks(CALLBACK.DISCONNECTED)
+            self.callbacks.DISCONNECTED.call_handlers()
             time.sleep(CONNECTION_RETRY_INTERVAL)
 
     def connect(self):
@@ -908,7 +903,7 @@ class Mumble(threading.Thread):
                 if self.connected == CONN_STATE.AUTHENTICATING:
                     self.connected = CONN_STATE.CONNECTED
                     self.ready_lock.release()
-                    self.callbacks(CALLBACK.CONNECTED)
+                    self.callbacks.CONNECTED.call_handlers()
 
             case TCP_MSG_TYPE.ChannelRemove:
                 self.channels.remove(mess.channel_id)
@@ -923,14 +918,14 @@ class Mumble(threading.Thread):
                 self.users.update(mess)
 
             case TCP_MSG_TYPE.TextMessage:
-                self.callbacks(CALLBACK.TEXT_MESSAGE_RECEIVED, mess)
+                self.callbacks.TEXT_MESSAGE_RECEIVED.call_handlers(mess)
 
             case TCP_MSG_TYPE.PermissionDenied:
-                self.callbacks(CALLBACK.PERMISSION_DENIED, mess)
+                self.callbacks.PERMISSION_DENIED.call_handlers(mess)
 
             case TCP_MSG_TYPE.ACL:
                 self.channels[mess.channel_id].update_acl(mess)
-                self.callbacks(CALLBACK.ACL_RECEIVED, mess)
+                self.callbacks.ACL_RECEIVED.call_handlers(mess)
 
             case TCP_MSG_TYPE.CryptSetup:
                 if not self.force_tcp_only:
@@ -946,7 +941,7 @@ class Mumble(threading.Thread):
                     self.udp_thread.start()
 
             case TCP_MSG_TYPE.ContextActionModify:
-                self.callbacks(CALLBACK.CONTEXT_ACTION_RECEIVED, mess)
+                self.callbacks.CONTEXT_ACTION_RECEIVED.call_handlers(mess)
 
             case TCP_MSG_TYPE.CodecVersion:
                 if self.send_audio:

@@ -3,10 +3,9 @@
 # WARNING! Don't put two bots in the same place!
 
 from mumble import Mumble
-from mumble.callbacks import CALLBACK
 
 pwd = ""  # password
-server = "localhost"
+server = "127.0.0.1"
 nick = "Bob"
 
 
@@ -16,6 +15,6 @@ def sound_received_handler(user, soundchunk):
 
 
 mumble = Mumble(server, nick, password=pwd)
-mumble.callbacks.set_callback(CALLBACK.SOUND_RECEIVED, sound_received_handler)
+mumble.callbacks.SOUND_RECEIVED.set_handler(sound_received_handler)
 mumble.start()
 mumble.join()

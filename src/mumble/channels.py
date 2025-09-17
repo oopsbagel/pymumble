@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from .constants import CALLBACK
 from threading import Lock
 from .errors import UnknownChannelError, TextTooLongError, ImageTooBigError
 from .acl import ACL
@@ -11,9 +10,8 @@ class Channels(dict):
     Object that Stores all channels and their properties.
     """
 
-    def __init__(self, mumble_object, callbacks):
+    def __init__(self, mumble_object):
         self.mumble_object = mumble_object
-        self.callbacks = callbacks
 
         self.lock = Lock()
 
@@ -23,10 +21,14 @@ class Channels(dict):
 
         if message.channel_id not in self:  # create the channel
             self[message.channel_id] = Channel(self.mumble_object, message)
-            self.callbacks(CALLBACK.CHANNEL_CREATED, self[message.channel_id])
+            self.mumble_object.callbacks.CHANNEL_CREATED.call_handlers(
+                self[message.channel_id]
+            )
         else:  # update the channel
             actions = self[message.channel_id].update(message)
-            self.callbacks(CALLBACK.CHANNEL_UPDATED, self[message.channel_id], actions)
+            self.mumble_object.callbacks.CHANNEL_UPDATED.call_handlers(
+                self[message.channel_id], actions
+            )
 
         self.lock.release()
 
@@ -37,7 +39,7 @@ class Channels(dict):
         if id in self:
             channel = self[id]
             del self[id]
-            self.callbacks(CALLBACK.CHANNEL_REMOVED, channel)
+            self.mumble_object.callbacks.CHANNEL_REMOVED.call_handlers(channel)
 
         self.lock.release()
 

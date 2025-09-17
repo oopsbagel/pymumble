@@ -26,5 +26,4 @@ with Mumble(server, nick, password=passwd, port=port) as mumble:
     )
     sound = sp.Popen(command, stdout=sp.PIPE, stderr=sp.DEVNULL, bufsize=1024)
     raw_music = sound.stdout.read()
-    mumble.send_audio.add_sound(raw_music)
-    mumble.send_audio.queue_empty.wait()
+    mumble.send_audio.add_sound(raw_music).wait()

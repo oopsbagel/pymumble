@@ -31,16 +31,6 @@ class InvalidFormatError(Exception):
         return repr(self.value)
 
 
-class UnknownCallbackError(Exception):
-    """Thrown when asked for an unknown callback"""
-
-    def __init__(self, value):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
 class UnknownChannelError(Exception):
     """Thrown when using an unknown channel"""
 

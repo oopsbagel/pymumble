@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from .constants import CALLBACK, TCP_MSG_TYPE
+from .constants import TCP_MSG_TYPE
 from .errors import TextTooLongError, ImageTooBigError
 from threading import Lock
 from . import messages
@@ -9,9 +9,8 @@ from . import Mumble_pb2
 class Users(dict):
     """Object that stores and update all connected users"""
 
-    def __init__(self, mumble_object, callbacks):
+    def __init__(self, mumble_object):
         self.mumble_object = mumble_object
-        self.callbacks = callbacks
 
         self.myself = None  # user object of the pymumble thread itself
         self.myself_session = None  # session number of the pymumble thread itself
@@ -23,12 +22,16 @@ class Users(dict):
 
         if message.session not in self:
             self[message.session] = User(self.mumble_object, message)
-            self.callbacks(CALLBACK.USER_CREATED, self[message.session])
+            self.mumble_object.callbacks.USER_CREATED.call_handlers(
+                self[message.session]
+            )
             if message.session == self.myself_session:
                 self.myself = self[message.session]
         else:
             actions = self[message.session].update(message)
-            self.callbacks(CALLBACK.USER_UPDATED, self[message.session], actions)
+            self.mumble_object.callbacks.USER_UPDATED.call_handlers(
+                self[message.session], actions
+            )
 
         self.lock.release()
 
@@ -39,7 +42,7 @@ class Users(dict):
         if message.session in self:
             user = self[message.session]
             del self[message.session]
-            self.callbacks(CALLBACK.USER_REMOVED, user, message)
+            self.mumble_object.callbacks.USER_REMOVED.call_handlers(user, message)
 
         self.lock.release()
 

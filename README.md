@@ -40,7 +40,6 @@ with Mumble("127.0.0.1", "A Weedy Samaritan", debug=False) as m:
         f"Hello, {usernames}. You're all Brian! You're all individuals!"
     )
 
-    audio_file = "./audio.opus"
     sound = Popen("ffmpeg -i audio.opus -ar 48000 -b:a 64k -f s16le -".split(), stdout=PIPE).stdout.read()
     m.send_audio.add_sound(sound).wait()
 ```
@@ -58,7 +57,7 @@ The following enhancements are included in pymumble 2.0.0:
 In order to bring pymumble up to date with modern python development practices, the following breaking changes have been introduced in version 2.0.0:
 
 - Change the import path from `pymumble_py3` to simply `mumble`.
-- Change callback constants to an enum. e.g., `PYMUMBLE_CLBK_SOUNDRECEIVED` is now `CALLBACK.SOUND_RECEIVED`.
+- Replace callback constants with a class interface. e.g., `Mumble.callbacks.set_callback(PYMUMBLE_CLBK_SOUNDRECEIVED, ...)` is now `Mumble.callbacks.SOUND_RECEIVED.set_handler(...)`.
 - Remove `Mumble.set_receive_sound()`, audio support is now enabled by default.
   - To disable audio support and avoid importing `opuslib`, instantiate the `Mumble` object with `Mumble(enable_audio=False)`.
   - To disable audio support after the object has been created set `m = Mumble(); m.enable_audio = False`. This will still import `opuslib`.

@@ -15,3 +15,6 @@ pymumble documentation
 
 .. automodule:: mumble.sendaudio
    :members:
+
+.. automodule:: mumble.callbacks
+   :members:
