@@ -82,8 +82,6 @@ class ReceivedAudioQueue:
 
         self.lock = Lock()
 
-        # to be sure, create every supported decoders for all users
-        # sometime, clients still use a codec for a while after server request another...
         self.decoders = {AUDIO_CODEC.OPUS: opuslib.Decoder(SAMPLE_RATE, 1)}
 
     def set_receive_sound(self, value):
