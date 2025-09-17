@@ -20,6 +20,8 @@ VERSION_STRING = "pymumble %s" % VERSION
 OS_STRING = platform.system() + " " + platform.machine()
 OS_VERSION_STRING = "Python %s" % platform.python_version()
 
+TRACE = 9  # custom logging level for Ping messages
+
 PING_INTERVAL = 10  # interval between 2 pings in sec
 
 SAMPLE_RATE = 48000  # in hz

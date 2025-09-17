@@ -16,6 +16,7 @@ from .commands import Commands
 from .constants import (
     CONN_STATE,
     CMD,
+    TRACE,
     TCP_MSG_TYPE,
     UDP_MSG_TYPE,
     PING_INTERVAL,
@@ -280,7 +281,7 @@ class MumbleUDP(threading.Thread):
        at the time of this writing. This therefore qualifies as "`rolling our
        own crypto`_", something we should `avoid doing`_ and therefore UDP
        audio is disabled by default in order to provide the best security
-       posture for users without making them decide what risks to accept.
+       posture for users.
 
        OCB2 support is included for compatibility with the existing official
        Mumble server and clients, but care should be taken that UDP audio is
@@ -518,6 +519,7 @@ class Mumble(threading.Thread):
             client_type
         )  # raise ValueError on invalid client type
 
+        logging.addLevelName(TRACE, "trace")
         self.Log = logging.getLogger("PyMumble")
         if debug:
             self.Log.setLevel(logging.DEBUG)
@@ -584,7 +586,6 @@ class Mumble(threading.Thread):
 
         self.connected = CONN_STATE.NOT_CONNECTED
         self.control_socket = None
-        self.media_socket = None  # Not implemented - for UDP media
 
         self.bandwidth = (
             BANDWIDTH  # reset the outgoing bandwidth to its default before connecting
@@ -739,7 +740,7 @@ class Mumble(threading.Thread):
         - sending audio packets
         - checking for disconnection
         """
-        self.Log.debug("entering loop")
+        self.Log.debug("entering main loop")
         self.exit = False
 
         last_ping = time.time()  # keep track of the last ping time
@@ -786,14 +787,14 @@ class Mumble(threading.Thread):
         ping.tcp_ping_var = self.ping_stats["var"]
         ping.tcp_packets = self.ping_stats["nb"]
 
-        self.Log.debug("sending: ping: %s", ping)
+        self.Log.log(TRACE, "sending: ping: %s", ping)
         self.send_message(TCP_MSG_TYPE.Ping, ping)
         self.ping_stats["time_send"] = int(time.time() * 1000)
-        self.Log.debug(self.ping_stats["last_rcv"])
+        self.Log.log(TRACE, self.ping_stats["last_rcv"])
         if self.ping_stats["last_rcv"] != 0 and int(
             time.time() * 1000
         ) > self.ping_stats["last_rcv"] + (60 * 1000):
-            self.Log.debug("Ping too long ! Disconnected ?")
+            self.Log.info("Ping too long ! Disconnected ?")
             self.connected = CONN_STATE.NOT_CONNECTED
 
     def receive_ping(self):
@@ -822,12 +823,16 @@ class Mumble(threading.Thread):
         :param type: Integer denoting the message type.
         :param message: The protobuf-encoded message.
         """
+        if type != TCP_MSG_TYPE.Ping:
+            self.Log.debug(f"sending message: {type} : {message}")
+        else:
+            self.Log.log(TRACE, f"sending message: {type} : {message}")
+
         packet = (
             struct.pack("!HL", type, message.ByteSize()) + message.SerializeToString()
         )
 
         while len(packet) > 0:
-            self.Log.debug("sending message")
             sent = self.control_socket.send(packet)
             if sent < 0:
                 raise socket.error("Server socket error")
@@ -844,7 +849,7 @@ class Mumble(threading.Thread):
             pass
 
         while len(self.receive_buffer) >= 6:  # header is present (type + length)
-            self.Log.debug("read control connection")
+            self.Log.log(TRACE, "read control connection")
             header = self.receive_buffer[0:6]
 
             if len(header) < 6:
@@ -868,7 +873,7 @@ class Mumble(threading.Thread):
         :param type: Integer denoting the message type.
         :param message: The protobuf-encoded message.
         """
-        self.Log.debug("dispatch control message")
+        self.Log.log(TRACE, "dispatch control message")
 
         try:
             msgtype = TCP_MSG_TYPE(type)
@@ -885,7 +890,10 @@ class Mumble(threading.Thread):
         MsgClass = getattr(Mumble_pb2, msgtype.name)
         mess = MsgClass()
         mess.ParseFromString(message)
-        self.Log.debug(f"message: {msgtype.name} : {mess}")
+        if msgtype != TCP_MSG_TYPE.Ping:
+            self.Log.debug(f"received message: {msgtype.name} : {mess}")
+        else:
+            self.Log.log(TRACE, f"received message: {msgtype.name} : {mess}")
 
         match msgtype:
             case TCP_MSG_TYPE.Ping:
