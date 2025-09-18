@@ -21,12 +21,12 @@ class Channels(dict):
 
         if message.channel_id not in self:  # create the channel
             self[message.channel_id] = Channel(self.mumble_object, message)
-            self.mumble_object.callbacks.channel_created.call_handlers(
+            self.mumble_object.callbacks.channel_created(
                 self[message.channel_id]
             )
         else:  # update the channel
             actions = self[message.channel_id].update(message)
-            self.mumble_object.callbacks.channel_updated.call_handlers(
+            self.mumble_object.callbacks.channel_updated(
                 self[message.channel_id], actions
             )
 
@@ -39,7 +39,7 @@ class Channels(dict):
         if id in self:
             channel = self[id]
             del self[id]
-            self.mumble_object.callbacks.channel_removed.call_handlers(channel)
+            self.mumble_object.callbacks.channel_removed(channel)
 
         self.lock.release()
 
