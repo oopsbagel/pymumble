@@ -117,7 +117,7 @@ class ReceivedAudioQueue:
                 pcm, sequence, len(pcm), calculated_time, type, target
             )
 
-            if not self.mumble_object.callbacks.SOUND_RECEIVED.get_handlers():
+            if not self.mumble_object.callbacks.sound_received.get_handlers():
                 self.queue.appendleft(newsound)
 
                 if len(self.queue) > 1 and self.queue[0].time < self.queue[1].time:

@@ -26,8 +26,8 @@ class Callback:
         def print_sender_name(user, soundchunk):
             print(f"Received sound from {user['name']}")
 
-        m.callbacks.SOUND_RECEIVED.add_handler(echo_soundchunk)
-        m.callbacks.SOUND_RECEIVED.add_handler(print_sender_name)
+        m.callbacks.sound_received.add_handler(echo_soundchunk)
+        m.callbacks.sound_received.add_handler(print_sender_name)
         m.start()
         m.join()
     """
@@ -73,20 +73,20 @@ class Callback:
 
 @dataclass(slots=True)
 class Callbacks:
-    CONNECTED = (
+    connected = (
         Callback()
     )  #: Called when the client has finished connecting. Sends no parameters.
-    DISCONNECTED = (
+    disconnected = (
         Callback()
     )  #: Called when the client has disconnected. Sends no parameters.
-    CHANNEL_CREATED = Callback()  #: Called when the client detects a new channel. Sends the channel object as the only parameter.
-    CHANNEL_UPDATED = Callback()  #: Called when the client receives a channel update. Sends the updated channel object and a dict with all the modified fields as two parameters.
-    CHANNEL_REMOVED = Callback()  #: Called when a channel is removed. Sends the removed channel object as the only parameter.
-    USER_CREATED = Callback()  #: Called when a new user connects. Sends the added user object as the only parameter.
-    USER_UPDATED = Callback()  #: Called when a user's state is updated. Sends the updated user object and a dict with all the modified fields as two parameters.
-    USER_REMOVED = Callback()  #: Called when a user is removed. Sends the removed User object and the mumble message as the only parameter.
-    SOUND_RECEIVED = Callback()  #: Called when a sound is received. Sends the User object that received the sound and the SoundChunk object itself as two parameters.
-    TEXT_MESSAGE_RECEIVED = Callback()  #: Called when a text message is received. Sends the received TextMessage protobuf message as the only parameter.
-    CONTEXT_ACTION_RECEIVED = Callback()  #: Called when a custom context menu is added or removed. Sends the received ContextActionModify protobuf message as the only parameter.
-    ACL_RECEIVED = Callback()  #: Called when an ACL message is received. Sends the received ACL protobuf message as the only parameter.
-    PERMISSION_DENIED = Callback()  #: Called when the PermissionDenied message is received. Sends the PermissionDenied protobuf message as the only parameter.
+    channel_created = Callback()  #: Called when the client detects a new channel. Sends the channel object as the only parameter.
+    channel_updated = Callback()  #: Called when the client receives a channel update. Sends the updated channel object and a dict with all the modified fields as two parameters.
+    channel_removed = Callback()  #: Called when a channel is removed. Sends the removed channel object as the only parameter.
+    user_created = Callback()  #: Called when a new user connects. Sends the added user object as the only parameter.
+    user_updated = Callback()  #: Called when a user's state is updated. Sends the updated user object and a dict with all the modified fields as two parameters.
+    user_removed = Callback()  #: Called when a user is removed. Sends the removed User object and the mumble message as the only parameter.
+    sound_received = Callback()  #: Called when a sound is received. Sends the User object that received the sound and the SoundChunk object itself as two parameters.
+    text_message_received = Callback()  #: Called when a text message is received. Sends the received TextMessage protobuf message as the only parameter.
+    context_action_received = Callback()  #: Called when a custom context menu is added or removed. Sends the received ContextActionModify protobuf message as the only parameter.
+    acl_received = Callback()  #: Called when an ACL message is received. Sends the received ACL protobuf message as the only parameter.
+    permission_denied = Callback()  #: Called when the PermissionDenied message is received. Sends the PermissionDenied protobuf message as the only parameter.

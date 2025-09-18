@@ -431,7 +431,7 @@ class MumbleUDP(threading.Thread):
         )
         if newsound is None:  # audio has been disabled for this user
             return
-        mumble.callbacks.SOUND_RECEIVED.call_handlers(
+        mumble.callbacks.sound_received.call_handlers(
             mumble.users[audio.sender_session], newsound
         )
 
@@ -653,10 +653,10 @@ class Mumble(threading.Thread):
                 self.connected = CONN_STATE.NOT_CONNECTED
 
             if not self.reconnect or not self.parent_thread.is_alive():
-                self.callbacks.DISCONNECTED.call_handlers()
+                self.callbacks.disconnected.call_handlers()
                 break
 
-            self.callbacks.DISCONNECTED.call_handlers()
+            self.callbacks.disconnected.call_handlers()
             time.sleep(CONNECTION_RETRY_INTERVAL)
 
     def connect(self):
@@ -911,7 +911,7 @@ class Mumble(threading.Thread):
                 if self.connected == CONN_STATE.AUTHENTICATING:
                     self.connected = CONN_STATE.CONNECTED
                     self.ready_lock.release()
-                    self.callbacks.CONNECTED.call_handlers()
+                    self.callbacks.connected.call_handlers()
 
             case TCP_MSG_TYPE.ChannelRemove:
                 self.channels.remove(mess.channel_id)
@@ -926,14 +926,14 @@ class Mumble(threading.Thread):
                 self.users.update(mess)
 
             case TCP_MSG_TYPE.TextMessage:
-                self.callbacks.TEXT_MESSAGE_RECEIVED.call_handlers(mess)
+                self.callbacks.text_message_received.call_handlers(mess)
 
             case TCP_MSG_TYPE.PermissionDenied:
-                self.callbacks.PERMISSION_DENIED.call_handlers(mess)
+                self.callbacks.permission_denied.call_handlers(mess)
 
             case TCP_MSG_TYPE.ACL:
                 self.channels[mess.channel_id].update_acl(mess)
-                self.callbacks.ACL_RECEIVED.call_handlers(mess)
+                self.callbacks.acl_received.call_handlers(mess)
 
             case TCP_MSG_TYPE.CryptSetup:
                 if not self.force_tcp_only:
@@ -949,7 +949,7 @@ class Mumble(threading.Thread):
                     self.udp_thread.start()
 
             case TCP_MSG_TYPE.ContextActionModify:
-                self.callbacks.CONTEXT_ACTION_RECEIVED.call_handlers(mess)
+                self.callbacks.context_action_received.call_handlers(mess)
 
             case TCP_MSG_TYPE.CodecVersion:
                 if self.send_audio:

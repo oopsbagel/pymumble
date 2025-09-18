@@ -70,7 +70,7 @@ def sound_received_handler(user, soundchunk):
 
 # Spin up a client and connect to mumble server
 mumble = Mumble(server, nick, password=pwd, port=port)
-mumble.callbacks.SOUND_RECEIVED.set_handler(sound_received_handler)
+mumble.callbacks.sound_received.set_handler(sound_received_handler)
 mumble.start()
 mumble.wait_until_connected()
 

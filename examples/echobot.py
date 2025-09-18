@@ -15,6 +15,6 @@ def sound_received_handler(user, soundchunk):
 
 
 mumble = Mumble(server, nick, password=pwd)
-mumble.callbacks.SOUND_RECEIVED.set_handler(sound_received_handler)
+mumble.callbacks.sound_received.set_handler(sound_received_handler)
 mumble.start()
 mumble.join()

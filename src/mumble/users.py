@@ -22,14 +22,14 @@ class Users(dict):
 
         if message.session not in self:
             self[message.session] = User(self.mumble_object, message)
-            self.mumble_object.callbacks.USER_CREATED.call_handlers(
+            self.mumble_object.callbacks.user_created.call_handlers(
                 self[message.session]
             )
             if message.session == self.myself_session:
                 self.myself = self[message.session]
         else:
             actions = self[message.session].update(message)
-            self.mumble_object.callbacks.USER_UPDATED.call_handlers(
+            self.mumble_object.callbacks.user_updated.call_handlers(
                 self[message.session], actions
             )
 
@@ -42,7 +42,7 @@ class Users(dict):
         if message.session in self:
             user = self[message.session]
             del self[message.session]
-            self.mumble_object.callbacks.USER_REMOVED.call_handlers(user, message)
+            self.mumble_object.callbacks.user_removed.call_handlers(user, message)
 
         self.lock.release()
 
