@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+from dataclasses import dataclass, field
 from .constants import TCP_MSG_TYPE
 from .errors import TextTooLongError, ImageTooBigError
 from threading import Lock
@@ -6,277 +6,265 @@ from . import messages
 from . import Mumble_pb2
 
 
-class Users(dict):
-    """Object that stores and update all connected users"""
+class Users:
+    """
+    Stores a list of User objects, as sent by the server.
 
-    def __init__(self, mumble_object):
-        self.mumble_object = mumble_object
+    Lookup Users by their name or session ID like a dictionary. Return the
+    entire user list as a dictionary with ``.by_name()`` or ``.by_session()``.
 
-        self.myself = None  # user object of the pymumble thread itself
-        self.myself_session = None  # session number of the pymumble thread itself
+    .. code-block:: python
+
+        >>> m.users["console"]
+        <User 93 "console" in channel 0>
+
+        >>> m.users[28]
+        <User 28 "user" id 1 in channel 0>
+
+        >>> m.users.by_name()
+        {'console': <User 93 "console" in channel 0>,
+         'user': <User 28 "user" id 1 in channel 1>}
+
+        >>> m.users.by_session()
+        {'console': <User 93 "console" in channel 0>,
+         'user': <User 28 "user" id 1 in channel 1>}
+
+        # .myself is an alias for your own user session
+        >>> m.users.myself == m.users["console"] == m.users[93]
+        True
+    """
+
+    def __init__(self, connection):
+        self.connection = connection
+        self.myself = None  # User object of the pymumble thread itself
+        self.my_session = None  # session number of the pymumble thread itself
         self.lock = Lock()
+        self._users = dict()
 
-    def update(self, message):
-        """Update a user information, based on the incoming message"""
+    def __getitem__(self, key):
+        if type(key) == str:
+            return {user.name: user for user in self._users.values()}[key]
+        elif type(key) == int:
+            return self._users[key]
+
+    def by_name(self):
+        "Return a dictionary of User objects indexed by their username."
+        return {user.name: user for user in self._users.values()}
+
+    def by_session(self):
+        "Return a dictionary of User objects indexed by their session ID."
+        return {user.session: user for user in self._users.values()}
+
+    def remove(self, message: Mumble_pb2.UserRemove):
+        "Remove a User based on a UserRemove message from the server."
         self.lock.acquire()
+        if message.session in self._users:
+            user = self._users[message.session]
+            del self._users[message.session]
+            self.connection.callbacks.user_removed(user, message)
+        self.lock.release()
 
-        if message.session not in self:
-            self[message.session] = User(self.mumble_object, message)
-            self.mumble_object.callbacks.user_created(
-                self[message.session]
-            )
-            if message.session == self.myself_session:
-                self.myself = self[message.session]
+    def set_myself(self, session: int):
+        "Mark `session` as this connection's own session ID."
+        self.my_session = session
+        if session in self._users:
+            self.myself = self._users[session]
+
+    def update(self, message: Mumble_pb2.UserState):
+        "Create or update a User based on a UserState message from the server."
+        self.lock.acquire()
+        if message.session not in self._users:
+            self._users[message.session] = User(self.connection, message)
+            self.connection.callbacks.user_created(self._users[message.session])
+            if message.session == self.my_session:
+                self.myself = self._users[message.session]
         else:
-            actions = self[message.session].update(message)
-            self.mumble_object.callbacks.user_updated(
-                self[message.session], actions
+            actions = self._users[message.session].update(message)
+            self.connection.callbacks.user_updated(
+                self._users[message.session], actions
             )
-
         self.lock.release()
 
-    def remove(self, message):
-        """Remove a user object based on server info"""
-        self.lock.acquire()
 
-        if message.session in self:
-            user = self[message.session]
-            del self[message.session]
-            self.mumble_object.callbacks.user_removed(user, message)
+class User:
+    """
+    Tracks a User's state as sent by the server in UserState messages.
 
-        self.lock.release()
+    Attributes should be considered read only. Assigning to a documented field
+    attribute will send a UserState message to the server requesting the change.
+    Changes will be reflected in this instance when the server confirms the
+    state change with its own UserState message.
 
-    def set_myself(self, session):
-        """Set the "myself" user"""
-        self.myself_session = session
-        if session in self:
-            self.myself = self[session]
+    .. code-block:: python
 
-    def count(self):
-        """Return the count of connected users"""
-        return len(self)
+        >>> m.users.by_name()
+        {'console': <User 93 "console" in channel 0>,
+         'user': <User 28 "user" id 1 in channel 1>}
 
+        # Sends a TextMessage protobuf message with the contents "hi user!".
+        >>> m.users[28].send_text_message(f"hi {m.users[28].name}!")
 
-class User(dict):
-    """Object that store one user"""
+        # Request the server mark you as self_deaf and self_mute.
+        >>> m.users.myself.self_deaf = True
+        >>> m.users.myself.self_mute = True
 
-    def __init__(self, mumble_object, message):
-        self.mumble_object = mumble_object
-        self["session"] = message.session
-        self["channel_id"] = 0
+        # Check if "user" is a priority speaker:
+        >>> m.users["user"].priority_speaker
+
+        # Attempt to set another user's comment:
+        >>> m.users["user"].comment = "no comment"
+    """
+
+    session: int  #: User session ID whose state this is.
+    name: str  #: utf8 username
+    channel_id: int  #: The user's current channel ID.
+    #: Registered user ID, if the user is registered on the server.
+    user_id: int | None = None
+    mute: bool = False  #: If the user is muted by admin.
+    deaf: bool = False  #: If the user is deafened by admin.
+    suppress: bool = False  #: If the user has been suppressed from talking by a reason other than being muted.
+    self_mute: bool = False  #: If the user has self muted.
+    self_deaf: bool = False  #: If the user has self deafened.
+    priority_speaker: bool = False  #: If the user is a priority speaker.
+    recording: bool = False  #: If the user is currently recording.
+    comment: str | None = None  #: User comment if it is less than 128 bytes.
+    texture: bytes | None = None  #: User image if it is less than 128 bytes.
+    cert_hash: str | None = None  #: SHA1 hash of the user certificate.
+    #: SHA1 hash of the user comment if it is more than 128 bytes.
+    comment_hash: bytes | None = None
+    #: SHA1 hash of the user picture if it is more than 128 bytes.
+    texture_hash: bytes | None = None
+    listening_channels: set[int]  #: The channels the user is listening to.
+    #: A list of volume adjustments the user has applied to listeners.
+    listening_volume_adjustment: list[tuple[int, float]] | None = None
+
+    def __init__(self, connection, message):
+        self.connection = connection
+        self.__dict__["listening_channels"] = set()
+        # Remote users' channel_id will not be set if they are in the root channel when the client connects.
+        self.__dict__["channel_id"] = 0
+        self.sound = None
+        if self.connection.enable_audio:
+            self.create_audio_queue()
         self.update(message)
 
-        if mumble_object.enable_audio:
-            from .audio import ReceivedAudioQueue
+    def __repr__(self):
+        name = f'"{self.name}"'
+        if self.user_id:
+            name += f" id {self.user_id}"
+        return f"<User {self.session} {name} in channel {self.channel_id}>"
 
-            self.sound = ReceivedAudioQueue(
-                self.mumble_object
-            )  # will hold this user incoming audio
-        else:
-            self.sound = None
+    def create_audio_queue(self):
+        from .audio import ReceivedAudioQueue
+
+        self.sound = ReceivedAudioQueue(self.connection)
 
     def update(self, message):
-        """Update user state, based on an incoming message"""
-        actions = dict()
+        """
+        Update a user's information from a UserState message.
+        Returns a dictionary of changed values.
+        """
+        changes = dict()
 
-        if message.HasField("actor"):
-            actions["actor"] = message.actor
-
-        for field, value in message.ListFields():
-            if field.name in (
-                "session",
-                "actor",
-                "comment",
-                "texture",
-                "plugin_context",
-                "plugin_identity",
-            ):
-                continue
-            actions.update(self.update_field(field.name, value))
+        for channel in message.listening_channel_add:
+            self.listening_channels.add(channel)
+        for channel in message.listening_channel_remove:
+            self.listening_channels.remove(channel)
 
         if message.HasField("comment_hash"):
             if message.HasField("comment"):
-                self.mumble_object.blobs[message.comment_hash] = message.comment
+                self.connection.blobs[message.comment_hash] = message.comment
             else:
-                self.mumble_object.blobs.get_user_comment(message.comment_hash)
+                self.connection.blobs.get_user_comment(message.comment_hash)
         if message.HasField("texture_hash"):
             if message.HasField("texture"):
-                self.mumble_object.blobs[message.texture_hash] = message.texture
+                self.connection.blobs[message.texture_hash] = message.texture
             else:
-                self.mumble_object.blobs.get_user_texture(message.texture_hash)
+                self.connection.blobs.get_user_texture(message.texture_hash)
 
-        return actions  # return a dict, useful for the callback functions
+        for field, value in message.ListFields():
+            if field.name in (
+                "actor",
+                "listening_channel_add",
+                "listening_channel_remove",
+            ):
+                continue
+            if getattr(self, field.name, None) != value:
+                changes[field.name] = value
+            self.__dict__[field.name] = value
 
-    def update_field(self, name, field):
-        """Update one state value for a user"""
-        actions = dict()
-        if name not in self or self[name] != field:
-            self[name] = field
-            actions[name] = field
+        return changes
 
-        return actions
+    def _send(self, params):
+        p = {"session": self.session} | params
+        cmd = messages.ModUserState(self.connection.users.my_session, p)
+        self.connection.execute_command(cmd)
 
-    def get_property(self, property):
-        if property in self:
-            return self[property]
+    def __setattr__(self, attr, val):
+        FIELDS = [
+            "channel_id",
+            "user_id",
+            "mute",
+            "deaf",
+            "suppress",
+            "self_mute",
+            "self_deaf",
+            "priority_speaker",
+            "recording",
+            "comment",
+            "texture",
+            "plugin_context",
+        ]
+        if attr in FIELDS:
+            return self._send({attr: val})
+        elif attr == "listening_channels":
+            to_add = val - self.listening_channels
+            to_remove = self.listening_channels - val
+            if to_add:
+                self._send({"listening_channel_add": list(to_add)})
+            if to_remove:
+                self._send({"listening_channel_remove": list(to_remove)})
         else:
-            return None
-
-    def mute(self):
-        """Mute a user"""
-        params = {"session": self["session"]}
-
-        if self["session"] == self.mumble_object.users.myself_session:
-            params["self_mute"] = True
-        else:
-            params["mute"] = True
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def unmute(self):
-        """Unmute a user"""
-        params = {"session": self["session"]}
-
-        if self["session"] == self.mumble_object.users.myself_session:
-            params["self_mute"] = False
-        else:
-            params["mute"] = False
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def deafen(self):
-        """Deafen a user"""
-        params = {"session": self["session"]}
-
-        if self["session"] == self.mumble_object.users.myself_session:
-            params["self_deaf"] = True
-        else:
-            params["deaf"] = True
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def undeafen(self):
-        """Undeafen a user"""
-        params = {"session": self["session"]}
-
-        if self["session"] == self.mumble_object.users.myself_session:
-            params["self_deaf"] = False
-        else:
-            params["deaf"] = False
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def suppress(self):
-        """Disable a user"""
-        params = {"session": self["session"], "suppress": True}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def unsuppress(self):
-        """Enable a user"""
-        params = {"session": self["session"], "suppress": False}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def recording(self):
-        """Set the user as recording"""
-        params = {"session": self["session"], "recording": True}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def unrecording(self):
-        """Set the user as not recording"""
-        params = {"session": self["session"], "recording": False}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def comment(self, comment):
-        """Set the user comment"""
-        params = {"session": self["session"], "comment": comment}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def texture(self, texture):
-        """Set the user texture"""
-        params = {"session": self["session"], "texture": texture}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
+            self.__dict__[attr] = val
 
     def register(self):
-        """Register the user (mostly for myself)"""
-        params = {"session": self["session"], "user_id": 0}
+        """Register the user (mostly for myself)"""  # what?
+        self._send({"user_id": 0})
 
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
+    def kick(self, reason=""):
+        params = {"session": self.session, "reason": reason, "ban": False}
+        cmd = messages.RemoveUser(self.connection.users.my_session, params)
+        self.connection.execute_command(cmd)
 
-    def update_context(self, context_name):
-        params = {"session": self["session"], "plugin_context": context_name}
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
+    def ban(self, reason=""):
+        params = {"session": self.session, "reason": reason, "ban": True}
+        cmd = messages.RemoveUser(self.connection.users.my_session, params)
+        self.connection.execute_command(cmd)
 
     def move_in(self, channel_id, token=None):
         if token:
             authenticate = Mumble_pb2.Authenticate()
-            authenticate.username = self.mumble_object.user
-            authenticate.password = self.mumble_object.password
-            authenticate.tokens.extend(self.mumble_object.tokens)
+            authenticate.username = self.connection.user
+            authenticate.password = self.connection.password
+            authenticate.tokens.extend(self.connection.tokens)
             authenticate.tokens.extend([token])
             authenticate.opus = True
-            self.mumble_object.Log.debug("sending: authenticate: %s", authenticate)
-            self.mumble_object.send_message(TCP_MSG_TYPE.Authenticate, authenticate)
+            self.connection.Log.debug("sending: authenticate: %s", authenticate)
+            self.connection.send_message(TCP_MSG_TYPE.Authenticate, authenticate)
 
-        session = self.mumble_object.users.myself_session
+        session = self.connection.users.my_session
         cmd = messages.MoveCmd(session, channel_id)
-        self.mumble_object.execute_command(cmd)
+        self.connection.execute_command(cmd)
 
     def send_text_message(self, message):
         """Send a text message to the user."""
 
-        # TODO: This check should be done inside execute_command()
-        # However, this is currently not possible because execute_command() does
-        # not actually execute the command.
-        if len(message) > self.mumble_object.get_max_image_length() != 0:
-            raise ImageTooBigError(self.mumble_object.get_max_image_length())
+        if len(message) > self.connection.get_max_image_length() != 0:
+            raise ImageTooBigError(self.connection.get_max_image_length())
 
         if not ("<img" in message and "src" in message):
-            if len(message) > self.mumble_object.get_max_message_length() != 0:
-                raise TextTooLongError(self.mumble_object.get_max_message_length())
+            if len(message) > self.connection.get_max_message_length() != 0:
+                raise TextTooLongError(self.connection.get_max_message_length())
 
-        cmd = messages.TextPrivateMessage(self["session"], message)
-        self.mumble_object.execute_command(cmd)
-
-    def kick(self, reason=""):
-        params = {"session": self["session"], "reason": reason, "ban": False}
-
-        cmd = messages.RemoveUser(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def ban(self, reason=""):
-        params = {"session": self["session"], "reason": reason, "ban": True}
-
-        cmd = messages.RemoveUser(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def add_listening_channels(self, channel):
-        """Add user to listening channel"""
-        params = {"session": self["session"], "listening_channel_add": channel}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
-
-    def remove_listening_channels(self, channel):
-        """Remove user from listening channel"""
-        params = {"session": self["session"], "listening_channel_remove": channel}
-
-        cmd = messages.ModUserState(self.mumble_object.users.myself_session, params)
-        self.mumble_object.execute_command(cmd)
+        cmd = messages.TextPrivateMessage(self.session, message)
+        self.connection.execute_command(cmd)

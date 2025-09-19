@@ -431,9 +431,7 @@ class MumbleUDP(threading.Thread):
         )
         if newsound is None:  # audio has been disabled for this user
             return
-        mumble.callbacks.sound_received(
-            mumble.users[audio.sender_session], newsound
-        )
+        mumble.callbacks.sound_received(mumble.users[audio.sender_session], newsound)
 
 
 class Mumble(threading.Thread):
@@ -483,7 +481,7 @@ class Mumble(threading.Thread):
         m.wait_until_connected()
 
         # Return the current channel object.
-        # my_channel() shortcut for self.channels[self.users.myself["channel_id"]]
+        # my_channel() shortcut for self.channels[self.users.myself.channel_id]
         chan = m.my_channel()
 
         # Send a text message to the current channel.
@@ -1233,7 +1231,7 @@ class Mumble(threading.Thread):
 
     def my_channel(self):
         """Return the currently occupied Mumble :class:`Channel`."""
-        return self.channels[self.users.myself["channel_id"]]
+        return self.channels[self.users.myself.channel_id]
 
     def denial_type(self, n: str):
         return Mumble_pb2.PermissionDenied.DenyType.Name(n)

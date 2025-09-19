@@ -21,9 +21,7 @@ class Channels(dict):
 
         if message.channel_id not in self:  # create the channel
             self[message.channel_id] = Channel(self.mumble_object, message)
-            self.mumble_object.callbacks.channel_created(
-                self[message.channel_id]
-            )
+            self.mumble_object.callbacks.channel_created(self[message.channel_id])
         else:  # update the channel
             actions = self[message.channel_id].update(message)
             self.mumble_object.callbacks.channel_updated(
@@ -149,8 +147,8 @@ class Channel(dict):
 
     def get_users(self):
         users = []
-        for user in list(self.mumble_object.users.values()):
-            if user["channel_id"] == self["channel_id"]:
+        for user in self.mumble_object.users.by_name().values():
+            if user.channel_id == self["channel_id"]:
                 users.append(user)
         return users
 
@@ -200,7 +198,7 @@ class Channel(dict):
     def move_in(self, session=None):
         """Ask to move a session in a specific channel.  By default move pymumble own session"""
         if session is None:
-            session = self.mumble_object.users.myself_session
+            session = self.mumble_object.users.my_session
 
         cmd = messages.MoveCmd(session, self["channel_id"])
         self.mumble_object.execute_command(cmd)
@@ -222,7 +220,7 @@ class Channel(dict):
             if len(message) > self.mumble_object.get_max_message_length() != 0:
                 raise TextTooLongError(self.mumble_object.get_max_message_length())
 
-        session = self.mumble_object.users.myself_session
+        session = self.mumble_object.users.my_session
 
         cmd = messages.TextMessage(session, self["channel_id"], message)
         self.mumble_object.execute_command(cmd)

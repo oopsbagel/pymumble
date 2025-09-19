@@ -13,8 +13,11 @@ pymumble documentation
 .. automodule:: mumble
    :members:
 
-.. automodule:: mumble.sendaudio
+.. automodule:: mumble.audio
    :members:
 
 .. automodule:: mumble.callbacks
+   :members:
+
+.. automodule:: mumble.users
    :members:

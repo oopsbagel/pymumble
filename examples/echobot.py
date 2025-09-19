@@ -6,7 +6,7 @@ from mumble import Mumble
 
 pwd = ""  # password
 server = "127.0.0.1"
-nick = "Bob"
+nick = "spooky echo"
 
 
 def sound_received_handler(user, soundchunk):
